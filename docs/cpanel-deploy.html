@@ -1,5 +1,10 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ocellus cPanel Deploy</title>
-<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="How to upload the Ocellus static build to cPanel shared hosting: file manager and FTP, domain and AutoSSL, the Apache modules it needs, and what each failure looks like.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -217,6 +222,8 @@
     .steps > li { padding-left: 40px; }
   }
 </style>
+</head>
+<body>
 
 <div class="wrap">
 
@@ -370,3 +377,5 @@ rsync -avz --delete dist/cpanel/ user@yourdomain.tld:public_html/</pre></div>
   </footer>
 
 </div>
+</body>
+</html>

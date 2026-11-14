@@ -47,6 +47,52 @@ export function absolute(path = "/"): string {
   return SITE.url + (path.startsWith("/") ? path : `/${path}`);
 }
 
+/**
+ * Metadata for one page, with canonical and og:url derived from the same path.
+ *
+ * Next replaces a parent's `openGraph` object wholesale rather than merging
+ * into it, so a page that sets no openGraph inherits the root layout's
+ * `url`. Every subpage was therefore advertising the home page as its social
+ * identity: sharing /checks/ produced a card that linked to /. Deriving both
+ * URLs from `path` here is what keeps them equal, and keeps them right if a
+ * route is ever renamed. The description defaults to the site tagline because
+ * an og:description that silently goes missing is worse than a generic one.
+ */
+export function pageMeta({
+  title,
+  description = SITE.tagline,
+  path,
+}: {
+  title: string;
+  description?: string;
+  path: string;
+}) {
+  const fullTitle = `${title} · ${SITE.name}`;
+  return {
+    // Plain title: the root layout's `title.template` appends the site name to
+    // <title>. openGraph gets no such template, so it is written in full.
+    title,
+    description,
+    alternates: { canonical: absolute(path) },
+    openGraph: {
+      type: "website" as const,
+      siteName: SITE.name,
+      title: fullTitle,
+      description,
+      url: absolute(path),
+      images: [
+        { url: asset("/og.png"), width: 1200, height: 630, alt: `${SITE.name} website audit` },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image" as const,
+      title: fullTitle,
+      description,
+      images: [asset("/og.png")],
+    },
+  };
+}
+
 /** Primary navigation. The header, footer and sitemap all read this. */
 export const ROUTES = [
   { href: "/", label: "Home" },

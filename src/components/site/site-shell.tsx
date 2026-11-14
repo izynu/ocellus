@@ -144,7 +144,7 @@ export function SiteFooter() {
             .
           </p>
           <p style={{ fontSize: 13, color: "var(--muted-foreground)" }}>
-            Every scan runs in your browser. Nothing is uploaded.
+            Every scan runs in your browser. Nothing is uploaded to this site.
           </p>
         </div>
       </div>

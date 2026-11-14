@@ -1,6 +1,6 @@
 import { SiteShell } from "@/components/site/site-shell";
 import { checks } from "@/lib/checks";
-import { SITE, asset } from "@/lib/site";
+import { SITE, asset, pageMeta } from "@/lib/site";
 
 /**
  * About.
@@ -11,11 +11,11 @@ import { SITE, asset } from "@/lib/site";
  * replaces every generated value with a measured one or an explicit gap.
  */
 
-export const metadata = {
+export const metadata = pageMeta({
   title: "About",
   description: `${SITE.name} is a browser-side website audit maintained by ${SITE.author}. What it is, where the source lives, and why it was rebuilt around measured values.`,
-  alternates: { canonical: asset("/about") },
-};
+  path: "/about",
+});
 
 export default function AboutPage() {
   return (

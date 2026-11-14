@@ -109,7 +109,14 @@ export default function HomePage() {
           keeps what it could not reach separate from what it measured.
         </p>
 
-        <form action="/scan" method="get" className="mt-9 flex flex-col gap-2.5 sm:flex-row">
+        {/*
+          `action` is a literal attribute, not a `next/link`, so Next does not
+          apply basePath to it. Without asset() the Pages build posts to
+          /scan instead of /ocellus/scan and the primary CTA 404s there while
+          working fine on cPanel, which is the worst kind of bug to find in
+          production.
+        */}
+        <form action={asset("/scan")} method="get" className="mt-9 flex flex-col gap-2.5 sm:flex-row">
           <label htmlFor="url" className="sr-only">
             Website address
           </label>
@@ -129,7 +136,8 @@ export default function HomePage() {
           </button>
         </form>
         <p className="mt-3" style={{ fontSize: 13.5, color: "var(--muted-foreground)" }}>
-          {checks.length} checks. Nothing leaves your browser.
+          {checks.length} checks. No account, and no server of ours in between: your browser queries
+          each public source directly.
         </p>
       </section>
 

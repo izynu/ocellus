@@ -288,7 +288,8 @@ export function ScanWorkspace() {
             }}
           >
             {checks.length} checks run in your browser against public sources.
-            Nothing is uploaded. A full scan usually takes 15 to 30 seconds.
+            Nothing is uploaded to this site. Each check appears as its source answers, so the
+            first results are visible before the slowest one finishes.
           </p>
 
           <h2 className="eyebrow" style={{ marginTop: 22 }}>

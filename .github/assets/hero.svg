@@ -26,17 +26,13 @@
     <ellipse cx="230" cy="40" rx="360" ry="300" fill="url(#poolA)"/>
     <ellipse cx="1080" cy="400" rx="330" ry="280" fill="url(#poolB)"/>
 
-    <!-- The mark, with a slow pupil drift: the eye looking across a page. -->
+    <!-- The mark. The pupil is centred and still: an image that loops forever
+         in a README is motion for its own sake, and this one has no job. -->
     <g transform="translate(96,104)">
       <rect width="96" height="96" rx="21" fill="#10151c" stroke="#ffffff" stroke-opacity="0.08"/>
       <circle cx="48" cy="48" r="29" fill="none" stroke="#4fd1c5" stroke-opacity="0.3" stroke-width="3"/>
       <circle cx="48" cy="48" r="18.5" fill="none" stroke="#4fd1c5" stroke-width="3"/>
-      <g>
-        <circle cx="48" cy="48" r="7.6" fill="#4fd1c5"/>
-        <animateTransform attributeName="transform" type="translate"
-          values="0 0; 7 -4; 0 0; -7 4; 0 0" dur="7s" repeatCount="indefinite" calcMode="spline"
-          keySplines="0.4 0 0.2 1; 0.4 0 0.2 1; 0.4 0 0.2 1; 0.4 0 0.2 1"/>
-      </g>
+      <circle cx="48" cy="48" r="7.6" fill="#4fd1c5"/>
     </g>
 
     <text x="96" y="268" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="66" font-weight="600" fill="#e8ecf2" letter-spacing="-2">Ocellus</text>
@@ -66,15 +62,17 @@
       </g>
     </g>
 
-    <!-- Right: a score dial that fills once, then holds. -->
+    <!-- Right: the dial as a shape, with no number on it.
+         An earlier version showed a specific score and grade. That was a made-up
+         result sitting in the first image anyone sees, which is the one thing a
+         measurement tool must never do. The dial keeps its form and drops the
+         claim. -->
     <g transform="translate(940,210)">
       <circle r="86" fill="none" stroke="#ffffff" stroke-opacity="0.07" stroke-width="10"/>
-      <circle r="86" fill="none" stroke="#4fd1c5" stroke-width="10" stroke-linecap="round"
-              stroke-dasharray="540" stroke-dashoffset="108" transform="rotate(-90)">
-        <animate attributeName="stroke-dashoffset" from="540" to="108" dur="2.2s" begin="0.3s" fill="freeze" calcMode="spline" keySplines="0.3 0 0.2 1"/>
-      </circle>
-      <text x="0" y="8" text-anchor="middle" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="54" font-weight="600" fill="#e8ecf2">80</text>
-      <text x="0" y="34" text-anchor="middle" font-family="JetBrains Mono, Menlo, monospace" font-size="13" fill="#94a1b2">grade B</text>
+      <circle r="86" fill="none" stroke="#4fd1c5" stroke-opacity="0.55" stroke-width="10" stroke-linecap="round"
+              stroke-dasharray="118 422" stroke-dashoffset="0" transform="rotate(-90)"/>
+      <text x="0" y="6" text-anchor="middle" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="30" font-weight="600" fill="#e8ecf2">score</text>
+      <text x="0" y="32" text-anchor="middle" font-family="JetBrains Mono, Menlo, monospace" font-size="13" fill="#94a1b2">weighted</text>
     </g>
   </g>
 </svg>

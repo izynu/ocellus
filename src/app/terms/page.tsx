@@ -1,5 +1,5 @@
 import { SiteShell } from "@/components/site/site-shell";
-import { SITE, asset } from "@/lib/site";
+import { SITE, pageMeta } from "@/lib/site";
 
 /**
  * Terms.
@@ -10,12 +10,12 @@ import { SITE, asset } from "@/lib/site";
  * page points there rather than naming one.
  */
 
-export const metadata = {
+export const metadata = pageMeta({
   title: "Terms",
   description:
     "Terms of use for Ocellus: provided as is, results are automated observations from public sources and not a security assessment, and only scan hosts you own or are authorised to scan.",
-  alternates: { canonical: asset("/terms") },
-};
+  path: "/terms",
+});
 
 export default function TermsPage() {
   return (

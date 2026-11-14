@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import Link from "next/link";
 import { SiteShell } from "@/components/site/site-shell";
 import { checks, GROUP_ORDER } from "@/lib/checks";
-import { SITE, asset } from "@/lib/site";
+import { SITE, pageMeta } from "@/lib/site";
 
 /**
  * The method page.
@@ -12,12 +12,12 @@ import { SITE, asset } from "@/lib/site";
  * and states the limits without softening them.
  */
 
-export const metadata = {
+export const metadata = pageMeta({
   title: "Method",
   description:
     "Where every value in an Ocellus report comes from, how the score and grade are computed, why an unavailable source is never scored as a pass, and the specifications each finding is judged against.",
-  alternates: { canonical: asset("/method") },
-};
+  path: "/method",
+});
 
 const SOURCES = [
   {

@@ -1,6 +1,6 @@
 import { SiteShell } from "@/components/site/site-shell";
 import { checks, GROUP_LABEL, GROUP_ORDER, groupOf } from "@/lib/checks";
-import { SITE, asset } from "@/lib/site";
+import { SITE, asset, pageMeta } from "@/lib/site";
 
 /**
  * The check catalogue.
@@ -10,11 +10,11 @@ import { SITE, asset } from "@/lib/site";
  * is written by hand except the framing around it.
  */
 
-export const metadata = {
+export const metadata = pageMeta({
   title: "Checks",
   description: `Every check Ocellus runs: ${checks.length} checks in ${GROUP_ORDER.length} groups, with the question each one asks and the weight it carries in the score.`,
-  alternates: { canonical: asset("/checks") },
-};
+  path: "/checks",
+});
 
 const WEIGHT_MEANING: Record<1 | 2 | 3, string> = {
   1: "context",

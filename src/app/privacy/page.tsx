@@ -1,5 +1,5 @@
 import { SiteShell } from "@/components/site/site-shell";
-import { SITE, asset } from "@/lib/site";
+import { SITE, asset, pageMeta } from "@/lib/site";
 
 /**
  * Privacy.
@@ -10,12 +10,12 @@ import { SITE, asset } from "@/lib/site";
  * none exists for this site.
  */
 
-export const metadata = {
+export const metadata = pageMeta({
   title: "Privacy",
   description:
     "What Ocellus stores and what it sends: no account, no cookies, no analytics, no third-party scripts, and a scan that queries public services directly from your browser.",
-  alternates: { canonical: asset("/privacy") },
-};
+  path: "/privacy",
+});
 
 export default function PrivacyPage() {
   return (
