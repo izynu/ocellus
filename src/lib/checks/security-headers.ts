@@ -507,6 +507,34 @@ export const securityHeaders: CheckDefinition = {
       };
     }
 
+    // An edge refusal is not the page. The proxy fetches from its own address,
+    // and when that address is challenged it relays the challenge's headers as
+    // though they were the site's. Grading them awarded a live scan of
+    // example.com a Grade F for missing HSTS and CSP that the site actually
+    // sends. A refusal says nothing about the visitor-facing policy, so the
+    // check declines to grade rather than inventing a verdict from it.
+    if (snapshot.challenge) {
+      return {
+        id: this.id,
+        title: this.title,
+        question: this.question,
+        status: "unavailable",
+        headline: `The response was an edge refusal (HTTP ${snapshot.status}), not the page, so the headers were not graded.`,
+        findings: [],
+        data: {
+          rules: [],
+          disclosure: [],
+          status: snapshot.status,
+          chainLength: snapshot.chain.length,
+          fingerprint: [],
+          grade: "n/a",
+        } satisfies HeadersData,
+        ms: Math.round(performance.now() - started),
+        source: "api.hackertarget.com header proxy",
+        note: "The site's edge challenged the header source's own request, so what came back describes the challenge, not the page a visitor receives. Open the site in a browser to read its real headers. A site that blocks automated requests entirely cannot be graded here.",
+      };
+    }
+
     const rules: HeaderRuleResult[] = [];
     const findings: Finding[] = [];
 

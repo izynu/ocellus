@@ -55,6 +55,42 @@ export async function fetchHtml(
   net: NetClient,
   target: Target
 ): Promise<HtmlDocument> {
+  // Direct first, reader second.
+  //
+  // The reader is not a proxy: it parses the page and serializes it again, which
+  // drops the doctype, re-quotes every attribute, and empties every `<svg>` that
+  // is not inside a `<template>`. A live fetch of react.dev returned all 123
+  // SVG elements self-closed with zero `<path>` children, so a DOM-node count
+  // from that route undercounts a page that draws its icons inline by roughly a
+  // quarter, and a byte count is the reader's serialization rather than the
+  // site's.
+  //
+  // The site's own bytes are available whenever it sends
+  // `Access-Control-Allow-Origin`, which react.dev, nextjs.org and svelte.dev
+  // all do. When it does not, the browser throws and the request costs one
+  // failed connection. So the direct attempt is free when it works and free
+  // when it does not, and it gives byte-faithful markup for the share of sites
+  // that permit it.
+  const direct = await net.text(target.url, {
+    timeoutMs: 15_000,
+    // No retry: a CORS refusal is not transient, and a retry would double the
+    // wait on the sites that cannot answer at all.
+    headers: { Accept: "text/html,application/xhtml+xml" },
+    cacheKey: `html-direct:${target.url}`,
+  });
+
+  if (direct.ok && direct.text.trim().length > 200) {
+    const source = direct.text;
+    return {
+      finalUrl: direct.url || target.url,
+      source,
+      doc: parse(source),
+      suspectInterstitial: looksLikeInterstitial(source),
+      via: "the site's own response",
+      byteFaithful: true,
+    };
+  }
+
   // The reader returns the rendered document as HTML when asked. It follows
   // redirects and sends CORS headers for any origin. It rate limits at 20
   // requests a minute per IP, and a single scan spends five of those, so a
@@ -88,12 +124,21 @@ export async function fetchHtml(
       doc: parse(source),
       suspectInterstitial: looksLikeInterstitial(source),
       via: "r.jina.ai reader",
+      // Re-serialized, so element and byte counts are not the site's own.
+      byteFaithful: false,
     };
   }
 
   // Fallback: the metadata endpoint returns a small JSON object with title,
   // description and Open Graph fields. Enough for the SEO checks, not enough
   // for markup analysis, and `doc` stays null so callers can tell.
+  //
+  // This is a last resort, not a second opinion. Its free tier allows five
+  // requests a day, so two scans can exhaust it, and a fallback that dies on
+  // the first busy day fails silently for every visitor at once. The reader
+  // above is the primary for that reason; this path exists only so a reader
+  // outage degrades the report to titles and descriptions rather than
+  // emptying it.
   const metaUrl = `https://api.microlink.io/?url=${encodeURIComponent(target.url)}&meta=true`;
   const meta = await net.json<{
     status?: string;
@@ -109,6 +154,9 @@ export async function fetchHtml(
       doc: parse(source),
       suspectInterstitial: false,
       via: "api.microlink.io metadata",
+      // A handful of tags rebuilt from a metadata object, not the document.
+      // Byte and node counts from it would describe this reconstruction.
+      byteFaithful: false,
     };
   }
 
@@ -118,6 +166,7 @@ export async function fetchHtml(
     doc: null,
     suspectInterstitial: false,
     via: "unavailable",
+    byteFaithful: false,
   };
 }
 
@@ -166,7 +215,35 @@ export async function fetchHeaders(
   }
 
   const parsed = parseRawHttp(res.text);
-  return { ...parsed, via: "api.hackertarget.com" };
+  return { ...parsed, via: "api.hackertarget.com", challenge: isEdgeRefusal(parsed) };
+}
+
+/**
+ * Whether the header block describes an edge refusing the proxy rather than the
+ * site's own response.
+ *
+ * The header source fetches the target from its own address. When that address
+ * is refused, it prints the refusal verbatim and hands it back with a 200 of its
+ * own, so nothing upstream can tell the two apart. A live scan of example.com
+ * did exactly this: the proxy's fetch hit Cloudflare's managed challenge and the
+ * report graded the challenge page's header set as the site's policy, producing
+ * "6 of 8 protective headers are missing, Grade F" for a site that serves
+ * HSTS and a full CSP to a normal visitor.
+ *
+ * The signature is a 4xx or 5xx status from an edge, carrying an HTML body. A
+ * real page does not answer its own homepage with one of those, and a site that
+ * genuinely blocks a region or a bot still is not describing its visitor-facing
+ * policy in that response. Either way the headers are not the page's.
+ */
+function isEdgeRefusal(parsed: { status: number; headers: Record<string, string[]> }): boolean {
+  if (parsed.status < 400) return false;
+  const contentType = parsed.headers["content-type"]?.[0] ?? "";
+  if (contentType && !/text\/html|application\/xhtml/i.test(contentType)) return false;
+  const edgeHeaders = ["cf-ray", "x-akamai-request-id", "x-sucuri-id", "x-iinfo", "x-cdn"];
+  const hasEdgeHeader = edgeHeaders.some((name) => parsed.headers[name] !== undefined);
+  const server = (parsed.headers["server"]?.[0] ?? "").toLowerCase();
+  const edgeServer = /cloudflare|akamai|sucuri|imperva|incapsula|fastly|cloudfront/.test(server);
+  return hasEdgeHeader || edgeServer;
 }
 
 /**
@@ -224,7 +301,6 @@ export function header(
 ): string | undefined {
   return snapshot.headers[name.toLowerCase()]?.[0];
 }
-
 /** Every value for a header, joined with ", " where the spec allows it. */
 export function headerAll(snapshot: HeaderSnapshot, name: string): string[] {
   return snapshot.headers[name.toLowerCase()] ?? [];

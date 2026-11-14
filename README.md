@@ -24,15 +24,15 @@ Each check answers a single question and reports what it measured. They are grou
 | Group | What it determines |
 | --- | --- |
 | **Transport and certificates** | What certificates have been issued for the domain, by which authorities, for which hostnames, how long they last, and which of them were revoked |
-| **Name system** | Every address, mail, name-server and text record the zone publishes, when the registration began and expires, whether a wildcard answers for names nobody registered, and whether DNSSEC is in place |
+| **Name system** | Every address, mail, name-server and text record the zone publishes, when the registration began and expires, whether a wildcard answers for names nobody registered, whether DNSSEC is in place, which alias a host points at, and which network each nameserver sits on |
 | **Response headers** | Whether the server sends the headers that tell a browser how to behave, how strong each one is, and which CDN, proxy or web application firewall answered in front of the origin |
 | **Email** | Whether SPF, DKIM and DMARC exist and whether they actually prevent forgery |
-| **Infrastructure** | Where the site is hosted, who announces the address, what Shodan has observed listening on it, and whether the software it names appears in the catalogue of vulnerabilities known to be exploited |
+| **Infrastructure** | Where the site is hosted, who announces the address, what Shodan has observed listening on it, which other hostnames passive DNS has recorded on the same address, and whether the software it names appears in the catalogue of vulnerabilities known to be exploited |
 | **Privacy** | Which cookies are set before consent, which trackers load, and what third parties the page contacts |
 | **Content and accessibility** | Heading structure, alt text, form labels, duplicate ids, tab order, and the language declaration |
-| **Performance** | Render-blocking resources, compression, caching, image dimensions and DOM size |
+| **Performance** | Render-blocking resources, compression, caching, image dimensions, DOM size, and an estimate of the carbon cost of one page view |
 | **Search and preview** | Crawl directives, canonical, sitemap, and whether a shared link renders as a card |
-| **Reputation** | Whether the domain appears in threat intelligence, whether a filtering resolver refuses to resolve it, how widely it is seen in traffic, whether the operator has been breached, and whether it is marked as a false positive |
+| **Reputation** | Whether the domain appears in threat intelligence, whether a malware or phishing feed currently lists it, whether a filtering resolver refuses to resolve it, how widely it is seen in traffic, whether the operator has been breached, and whether it is marked as a false positive |
 | **Interface friction** | Pre-checked consent boxes, confirmshaming copy, forced actions, and scarcity pressure |
 
 A check that cannot run is reported as **unavailable** with the reason. It is removed from the score's denominator rather than counted as a pass. A site that blocks the scanner does not get a good grade for it.
@@ -58,11 +58,14 @@ No source requires a key, and each is queried from the visitor's browser.
 | [Tranco](https://tranco-list.eu) | Where the domain sits in a public traffic ranking |
 | [Shodan InternetDB](https://internetdb.shodan.io) | Open ports and known CVEs for the resolved address |
 | [ipwho.is](https://ipwho.is) | Geolocation and autonomous system |
-| [AlienVault OTX](https://otx.alienvault.com) | Threat intelligence pulses |
+| [AlienVault OTX](https://otx.alienvault.com) | Threat intelligence pulses, and the hostnames passive DNS has recorded on the resolved address |
+| [Google Safe Browsing](https://transparencyreport.google.com/safe-browsing/search), [NetAPI](https://netapi.com/compromised-urls/) and [OpenPhish](https://openphish.com/) | Whether a malware or phishing feed currently lists the site, and how many feeds actually answered |
 | [Have I Been Pwned](https://haveibeenpwned.com) | Whether the operator has appeared in a disclosed breach |
 | [CISA KEV](https://www.cisa.gov/known-exploited-vulnerabilities-catalog) and [FIRST EPSS](https://www.first.org/epss/) | Whether the software the server names is known to be exploited, and how likely |
 | [api.hackertarget.com](https://api.hackertarget.com) | Raw response headers and the redirect chain |
-| [r.jina.ai](https://r.jina.ai) | The document itself, because most sites send no CORS header |
+| [r.jina.ai](https://r.jina.ai) | The document itself, because most sites send no CORS header. A site that does permit a cross-origin read is fetched directly instead, so its bytes and element tree are its own |
+| [Website Carbon](https://www.websitecarbon.com) | An estimate of the carbon cost of one page view, as context rather than a verdict |
+| [RIPEstat](https://stat.ripe.net) | Which network announces each nameserver's address, and whether DNS is hosted separately from the site |
 
 ## Using it
 

@@ -48,6 +48,14 @@ export type EmailData = {
   spf: SpfData | null;
   dmarc: DmarcPolicy | null;
   dkim: Array<{ selector: string; present: boolean; keyType?: string; bits?: number }>;
+  /**
+   * True when the zone publishes a wildcard under _domainkey, so every name
+   * resolves to one record. `dkim` is empty in that case: a selector that
+   * answers only because of the wildcard has no key of its own, and listing it
+   * would claim a per-selector deployment the domain does not have. The empty
+   * array plus `wildcard: true` is the honest pair.
+   */
+  wildcard: boolean;
   mx: Array<{ priority: number; host: string }>;
   /**
    * MTA-STS is a two-part policy: a TXT record that announces it, and a policy
@@ -223,7 +231,16 @@ export const emailAuth: CheckDefinition = {
         status: "unavailable",
         headline: "The DNS resolver did not answer, so the mail records could not be read.",
         findings: [],
-        data: { spf: null, dmarc: null, dkim: [], mx: [], mtaSts: null, bimi: null, nullMx: false },
+        data: {
+          spf: null,
+          dmarc: null,
+          dkim: [],
+          wildcard: false,
+          mx: [],
+          mtaSts: null,
+          bimi: null,
+          nullMx: false,
+        },
         source: "Google and Cloudflare DNS over HTTPS",
         ms: Math.round(performance.now() - started),
       };
@@ -309,6 +326,19 @@ export const emailAuth: CheckDefinition = {
           : { selector, present: false };
       })
     );
+
+    // A zone that publishes a wildcard under _domainkey answers every selector
+    // with the same record, including selectors nobody has ever used. On such a
+    // zone each of the 31 lookups "finds" a revoked key, which reads as a
+    // catastrophic DKIM failure when it is one wildcard record being echoed 31
+    // times. The test is a selector no mail provider would ship.
+    const probeSelector = "ocellus-dkim-probe";
+    const probe = await ctx.dns.query(`${probeSelector}._domainkey.${domain}`, "TXT");
+    const probeRecord = probe.answers
+      .filter((r) => r.type === 16)
+      .map((r) => unquoteTxt(r.data))
+      .find((t) => /(?:^|;\s*)v=DKIM1\b/i.test(t) || /(?:^|;\s*)p=/i.test(t));
+    const dkimWildcard = Boolean(probeRecord);
     const dkimFound = dkim.filter((d) => d.present && !d.revoked);
 
     const findings: Finding[] = [];
@@ -436,7 +466,22 @@ export const emailAuth: CheckDefinition = {
     // A revoked key (empty p=) is not a working key, so it is counted apart
     // from dkimFound. The old code counted it as found and said nothing.
     const dkimRevoked = dkim.filter((d) => d.present && d.revoked);
-    if (dkimRevoked.length > 0) {
+    if (dkimWildcard) {
+      // One wildcard answers every selector, so the per-selector results say
+      // nothing about which selectors exist. Reporting 31 revoked keys here
+      // would be reporting the same record 31 times.
+      findings.push({
+        id: "email-dkim-wildcard",
+        title: "Every DKIM selector answers with the same record",
+        detail: `A query for ${probeSelector}._domainkey.${domain} returned "${probeRecord}", so the zone publishes a wildcard under _domainkey. Every selector therefore appears to exist, and the record it returns has an empty p= tag, which RFC 6376 defines as a revoked key. That is one wildcard record being echoed, not 31 revoked keys: a signature is verified against the selector named in its header, and none of these records can verify one.`,
+        severity: "high",
+        remediation: `Remove the wildcard at *._domainkey.${domain} and publish a real key only at the selector your mail provider signs with. If the wildcard was added to suppress lookups for unused selectors, it does the opposite: it makes every selector resolve to a record that cannot verify anything.`,
+        reference: {
+          label: "RFC 6376 §3.6.1",
+          url: "https://datatracker.ietf.org/doc/html/rfc6376#section-3.6.1",
+        },
+      });
+    } else if (dkimRevoked.length > 0) {
       findings.push({
         id: "email-dkim-revoked",
         title: "DKIM key has been revoked",
@@ -447,7 +492,7 @@ export const emailAuth: CheckDefinition = {
         reference: { label: "RFC 6376 §3.6.1", url: "https://datatracker.ietf.org/doc/html/rfc6376#section-3.6.1" },
       });
     }
-    if (dkimFound.length === 0) {
+    if (dkimFound.length === 0 && !dkimWildcard) {
       findings.push({
         id: "email-dkim-unknown",
         title: "No DKIM key found on a common selector",
@@ -515,7 +560,22 @@ export const emailAuth: CheckDefinition = {
     const parts: string[] = [];
     parts.push(spf ? "SPF present" : "no SPF");
     parts.push(dmarc ? `DMARC p=${dmarc.p ?? "unset"}` : "no DMARC");
-    parts.push(dkimFound.length ? `DKIM on ${dkimFound.map((d) => d.selector).join(", ")}` : "DKIM not confirmed");
+    parts.push(
+      dkimWildcard
+        ? "DKIM wildcard under _domainkey"
+        : dkimFound.length
+          ? `DKIM on ${dkimFound.map((d) => d.selector).join(", ")}`
+          : "DKIM not confirmed"
+    );
+
+    // A wildcard answers every selector with the same record, so none of the 31
+    // results is evidence that a selector has a key of its own. The array is
+    // emptied rather than filtered: keeping the entries would let the UI print
+    // "DKIM selectors: default, google, selector1 and 28 more" for a zone that
+    // publishes one record. The wildcard fact survives in `wildcard` and in the
+    // email-dkim-wildcard finding. Empty array plus wildcard: true is the
+    // honest pair.
+    const dkimData = dkimWildcard ? [] : dkim;
 
     return {
       id: this.id,
@@ -527,7 +587,8 @@ export const emailAuth: CheckDefinition = {
       data: {
         spf,
         dmarc,
-        dkim,
+        dkim: dkimData,
+        wildcard: dkimWildcard,
         mx: mxList,
         mtaSts: mtaStsTxt
           ? { dns: true, policy: mtaStsTxt, fileMode: mtaStsMode, fileOk: mtaStsFileOk }

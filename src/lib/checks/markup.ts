@@ -26,6 +26,12 @@ export type MarkupData = {
   headingCounts: Record<number, number>;
   images: { total: number; missingAlt: number; emptyAlt: number; samples: string[] };
   links: { total: number; empty: number; insecure: number; external: number };
+  /**
+   * The hosts the page actually links to, split by whether they are the site's
+   * own. Counted, not listed in full: a nav bar repeats one host forty times
+   * and a reader wants the distinct set.
+   */
+  linkedHosts: { internal: string[]; external: string[]; externalCount: number };
   forms: { total: number; unlabeled: number };
   duplicateIds: string[];
   inlineStyles: number;
@@ -153,6 +159,13 @@ export const markup: CheckDefinition = {
     let emptyLinks = 0;
     let insecure = 0;
     let external = 0;
+    // Distinct link targets by host. The hrefs were already being read and
+    // then discarded after counting, so keeping the host set costs one Set and
+    // answers a question the count cannot: which other sites does this page
+    // send visitors to. That is how a compromised or expired outbound link is
+    // found, and it is the one part of a link audit that needs no new request.
+    const internalHosts = new Set<string>();
+    const externalHosts = new Set<string>();
     for (const a of links) {
       const text = (a.textContent ?? "").trim();
       const hasLabel = text.length > 0 || a.getAttribute("aria-label") || a.querySelector("img[alt]:not([alt=''])");
@@ -165,10 +178,31 @@ export const markup: CheckDefinition = {
       if (/^https?:\/\//i.test(href)) {
         try {
           const host = new URL(href).hostname.toLowerCase();
-          if (!isSameSite(host, ctx.target)) external++;
+          if (isSameSite(host, ctx.target)) {
+            internalHosts.add(host);
+          } else {
+            external++;
+            externalHosts.add(host);
+          }
         } catch {
           // A relative or malformed href cannot be a cross-site absolute link.
         }
+      } else if (href.startsWith("//")) {
+        // A protocol-relative link is absolute in host terms, and reading it as
+        // internal because it has no scheme undercounted external links.
+        try {
+          const host = new URL(`https:${href}`).hostname.toLowerCase();
+          if (isSameSite(host, ctx.target)) internalHosts.add(host);
+          else {
+            external++;
+            externalHosts.add(host);
+          }
+        } catch {
+          // Malformed, so it cannot be classified.
+        }
+      } else if (href && !href.startsWith("#") && !/^(mailto|tel|javascript):/i.test(href)) {
+        // A relative path is a link to this same site.
+        internalHosts.add(ctx.target.host);
       }
     }
     if (emptyLinks > 0) {
@@ -347,6 +381,11 @@ export const markup: CheckDefinition = {
         headingCounts,
         images: { total: imgs.length, missingAlt: missingAlt.length, emptyAlt, samples: missingAlt.slice(0, 8) },
         links: { total: links.length, empty: emptyLinks, insecure, external },
+        linkedHosts: {
+          internal: [...internalHosts].sort(),
+          external: [...externalHosts].sort(),
+          externalCount: externalHosts.size,
+        },
         forms: { total: inputs.length, unlabeled },
         duplicateIds,
         inlineStyles,

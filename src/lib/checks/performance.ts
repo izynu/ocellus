@@ -129,7 +129,13 @@ export const performance: CheckDefinition = {
 
     // --- response headers ---
     // A failed header fetch must not be read as "the site sends nothing".
-    const headersAvailable = snapshot.via !== "unavailable" && snapshot.status > 0;
+    // Nor must an edge refusal: the proxy's own request was challenged, so the
+    // header block describes the challenge page. Reading its missing
+    // Content-Encoding as "the HTML is not compressed" and its no-store as
+    // "cache forbids storage" both reported defects of a response the site
+    // never sent to a visitor.
+    const headersAvailable =
+      snapshot.via !== "unavailable" && snapshot.status > 0 && !snapshot.challenge;
     const encoding = headersAvailable ? header(snapshot, "content-encoding") ?? null : null;
     const cacheControl = headersAvailable ? header(snapshot, "cache-control") ?? null : null;
     const hasEtag = headersAvailable && header(snapshot, "etag") !== undefined;
@@ -139,6 +145,15 @@ export const performance: CheckDefinition = {
     const findings: Finding[] = [];
     const totalBlocking = blockingScripts + blockingStylesheets;
     const kb = Math.round(documentBytes / 1024);
+
+    // Byte and node counts only mean something when the source is the site's
+    // own. The reader re-serializes the page: it empties every SVG outside a
+    // `<template>` and re-quotes attributes, which undercounted react.dev's
+    // nodes by 26 percent and its bytes by 44 percent in a measured comparison.
+    // A threshold judged on that number would either miss a real defect or
+    // invent one, so those two findings are skipped rather than reported from
+    // a figure that describes the reader's output.
+    const sizesMeasured = page.byteFaithful;
 
     if (totalBlocking > 3) {
       findings.push({
@@ -157,7 +172,11 @@ export const performance: CheckDefinition = {
     }
 
     const isHtml = !contentType || /text\/html|application\/xhtml\+xml/i.test(contentType);
-    if (headersAvailable && isHtml && !encoding && documentBytes > 8 * 1024) {
+    // The compression threshold is a byte comparison, so it has the same
+    // requirement as the other size findings: a re-serialized document can be
+    // either larger or smaller than the real one, and a threshold read off it
+    // is a threshold read off the wrong document.
+    if (headersAvailable && isHtml && !encoding && sizesMeasured && documentBytes > 8 * 1024) {
       findings.push({
         id: "performance-no-compression",
         title: "The HTML response is not compressed",
@@ -230,7 +249,7 @@ export const performance: CheckDefinition = {
       });
     }
 
-    if (domNodes > 1500) {
+    if (sizesMeasured && domNodes > 1500) {
       findings.push({
         id: "performance-dom-size",
         title: `${domNodes} elements in the document`,
@@ -245,7 +264,7 @@ export const performance: CheckDefinition = {
       });
     }
 
-    if (documentBytes > 250 * 1024) {
+    if (sizesMeasured && documentBytes > 250 * 1024) {
       findings.push({
         id: "performance-document-size",
         title: `The HTML document is ${kb} KB`,
@@ -280,14 +299,26 @@ export const performance: CheckDefinition = {
     const status: CheckResult["status"] =
       mediums >= 3 ? "fail" : actionable.length > 0 ? "warn" : findings.length > 0 ? "info" : "pass";
 
+    // When the document is a re-serialization, the two counts are not facts
+    // about the site, so the headline reports what was actually measured and
+    // omits them rather than stating a number the reader invented. The rest of
+    // the sentence still holds: render-blocking resources and images are
+    // element counts, and those survive re-serialization intact.
+    const sizeClause = sizesMeasured ? `${documentBytes} characters of HTML, ` : "";
+    const nodeClause = sizesMeasured
+      ? ` and ${domNodes} DOM node${domNodes === 1 ? "" : "s"}`
+      : "";
+
     const headline =
       actionable.length === 0
-        ? `${documentBytes} characters of HTML, ${totalBlocking} render-blocking resource${totalBlocking === 1 ? "" : "s"}, ${images.length} image${images.length === 1 ? "" : "s"} and ${domNodes} DOM nodes, with nothing above the reporting threshold.`
-        : `${actionable.length} performance issue${actionable.length === 1 ? "" : "s"} across ${totalBlocking} render-blocking resource${totalBlocking === 1 ? "" : "s"}, ${images.length} image${images.length === 1 ? "" : "s"} and ${domNodes} DOM node${domNodes === 1 ? "" : "s"}.`;
+        ? `${sizeClause}${totalBlocking} render-blocking resource${totalBlocking === 1 ? "" : "s"}, ${images.length} image${images.length === 1 ? "" : "s"}${nodeClause}, with nothing above the reporting threshold.`
+        : `${actionable.length} performance issue${actionable.length === 1 ? "" : "s"} across ${totalBlocking} render-blocking resource${totalBlocking === 1 ? "" : "s"}, ${images.length} image${images.length === 1 ? "" : "s"}${nodeClause}.`;
 
     const notes = [
       "Timings such as Largest Contentful Paint and Total Blocking Time need a real browser run and are not measured here.",
-      "Document size is the character count of the HTML the reader returned, not the compressed byte count on the wire.",
+      sizesMeasured
+        ? "Document size is the character count of the HTML the site returned, not the compressed byte count on the wire."
+        : "The document came through a reader service that re-serializes the page, so its character count and DOM node count describe the reader's output rather than the site's. Those two figures are omitted and their thresholds were not judged.",
     ];
     if (!headersAvailable) {
       notes.push("Response headers could not be retrieved, so compression, caching and validators were not judged.");

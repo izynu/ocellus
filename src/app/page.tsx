@@ -26,17 +26,17 @@ export const metadata = {
 const GROUP_NOTE: Record<CheckGroup, string> = {
   transport:
     "Which certificates have been issued for the domain, by which authorities, which of them were revoked, and every hop between the address you typed and the page that answered.",
-  dns: "The records the zone publishes for address, mail and name service, when the registration began and expires, whether a wildcard answers for names nobody registered, and whether the resolver validated them with DNSSEC.",
+  dns: "The records the zone publishes for address, mail and name service, when the registration began and expires, whether a wildcard answers for names nobody registered, whether the resolver validated them with DNSSEC, which alias a host points at, and which network each nameserver sits on.",
   headers:
     "Which protective response headers are set and whether each value is correct, whether the site publishes a current security contact, and which CDN, proxy or firewall sits in front of the origin.",
   email:
     "Whether mail claiming to be from this domain can be authenticated, and whether anyone else can forge it.",
   infrastructure:
-    "The address behind the host, the network that announces it, the ports an outside index has seen open, the hostnames under the domain, and whether the software the response names appears in the catalogue of exploited vulnerabilities.",
+    "The address behind the host, the network that announces it, the ports an outside index has seen open, the other hostnames recorded on that same address, the hostnames under the domain, and whether the software the response names appears in the catalogue of exploited vulnerabilities.",
   privacy: "What the response sets and the document loads before a visitor has agreed to anything.",
   content:
     "Document structure as assistive technology reads it: headings, alternative text, form labels, language and duplicate identifiers.",
-  performance: "What the document weighs and what the server says about compression and caching.",
+  performance: "What the document weighs, what the server says about compression and caching, and an estimate of the carbon cost of one page view.",
   seo: "Whether a crawler can reach the site, and what a search result or a link preview will show.",
   threat:
     "Threat intelligence that names the domain, whether a filtering resolver refuses to resolve it, how widely it is seen in traffic, and whether the operator has appeared in a disclosed breach.",

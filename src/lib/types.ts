@@ -132,6 +132,19 @@ export type HtmlDocument = {
   suspectInterstitial: boolean;
   /** Which route produced it, for the provenance line. */
   via: string;
+  /**
+   * True when `source` is the site's own bytes, fetched directly, rather than a
+   * re-serialization by the reader service.
+   *
+   * This decides whether byte and node counts may be judged. The reader parses
+   * the page and serializes it again, which drops every SVG child element
+   * outside a `<template>` and re-quotes attributes. Measured on react.dev, all
+   * 123 `<svg>` elements came back self-closed with zero `<path>` children, so
+   * a DOM-node count from that route undercounts a page that draws icons by
+   * about a quarter. A count taken from a re-serialization is not a fact about
+   * the site, so checks that report sizes read this flag first.
+   */
+  byteFaithful: boolean;
 };
 
 export type HeaderSnapshot = {
@@ -144,6 +157,13 @@ export type HeaderSnapshot = {
   /** Final URL after redirects. */
   finalUrl: string;
   via: string;
+  /**
+   * True when the header block is an edge refusing the header source rather
+   * than the site's own response. Checks must not draw negative conclusions
+   * ("no CSP", "no cookies", "not compressed") from such a response, because it
+   * describes a challenge page, not what a visitor receives.
+   */
+  challenge?: boolean;
 };
 
 export type ScanReport = {

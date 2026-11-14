@@ -72,6 +72,19 @@ function daysBetween(fromIso: string, toMs: number): number | null {
 }
 
 /**
+ * Days from now until an ISO date. Positive in the future, negative once the
+ * date has passed. This is the mirror of `daysBetween`, which measures elapsed
+ * time, and keeping them separate is deliberate: passing the arguments in the
+ * wrong order here reports a domain that expires next year as expired last
+ * year, which is a wrong verdict rather than a wrong number.
+ */
+function daysUntil(iso: string, nowMs: number): number | null {
+  const target = Date.parse(iso);
+  if (Number.isNaN(target)) return null;
+  return Math.round((target - nowMs) / 86_400_000);
+}
+
+/**
  * Status values that mean the domain cannot be deleted or moved out from under
  * its owner without an explicit act. Their presence is the normal, safe state.
  */
@@ -149,7 +162,7 @@ export const whois: CheckDefinition = {
       .filter(Boolean);
 
     const ageDays = registered ? daysBetween(registered, now) : null;
-    const daysToExpiry = expires ? daysBetween(expires, now) : null;
+    const daysToExpiry = expires ? daysUntil(expires, now) : null;
 
     const findings: Finding[] = [];
 

@@ -101,8 +101,14 @@ export const blocklist: CheckDefinition = {
         // The Accept header is not optional. The JSON form of DNS over HTTPS is
         // a separate representation, and this endpoint sends no CORS header on
         // the wire-format response, so a browser cannot read the default one.
+        //
+        // The timeout is generous because the first request to this host pays
+        // for a cold TLS handshake and a DoH connection setup, which was
+        // measured at 21 seconds in Chromium while a warm request took under
+        // 100 ms. A tight timeout reports a working resolver as unreachable.
         const res = await ctx.net.json<DohResponse>(resolver.url(domain), {
-          timeoutMs: 12_000,
+          timeoutMs: 30_000,
+          retry: true,
           headers: { Accept: "application/dns-json" },
           cacheKey: `blocklist:${resolver.name}:${domain}`,
         });

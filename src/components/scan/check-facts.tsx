@@ -21,6 +21,8 @@ import type { DnsData } from "@/lib/checks/dns-records";
 import type { DnssecData } from "@/lib/checks/dnssec";
 import type { WhoisData } from "@/lib/checks/whois";
 import type { DnsHygieneData } from "@/lib/checks/dns-hygiene";
+import type { DnsAliasesData } from "@/lib/checks/dns-aliases";
+import type { NameserversData } from "@/lib/checks/nameservers";
 import type { CtData } from "@/lib/checks/ct-logs";
 import type { CertificateRevocationData } from "@/lib/checks/certificate-revocation";
 import type { RedirectsData } from "@/lib/checks/redirects";
@@ -29,10 +31,12 @@ import type { EdgeProtectionData } from "@/lib/checks/edge-protection";
 import type { EmailData } from "@/lib/checks/email-auth";
 import type { SecurityTxtData } from "@/lib/checks/security-txt";
 import type { ExposureData } from "@/lib/checks/infrastructure";
+import type { CohostedData } from "@/lib/checks/cohosted";
 import type { VulnExposureData } from "@/lib/checks/vulnerability-exposure";
 import type { SubdomainsData } from "@/lib/checks/subdomains";
 import type { TechStackData } from "@/lib/checks/tech-stack";
 import type { ThreatIntelData } from "@/lib/checks/threat-intel";
+import type { MalwareListingsData } from "@/lib/checks/malware-listings";
 import type { BlocklistData } from "@/lib/checks/blocklist";
 import type { BreachData } from "@/lib/checks/breach-history";
 import type { ArchiveData } from "@/lib/checks/archive-history";
@@ -41,6 +45,7 @@ import type { PrivacyData } from "@/lib/checks/privacy";
 import type { MarkupData } from "@/lib/checks/markup";
 import type { SeoData } from "@/lib/checks/seo";
 import type { PerformanceData } from "@/lib/checks/performance";
+import type { CarbonData } from "@/lib/checks/carbon";
 import type { DarkPatternData } from "@/lib/checks/dark-patterns";
 
 type Fact = {
@@ -59,6 +64,11 @@ function list(items: Array<string | null | undefined>, max = 3): string {
   if (clean.length === 0) return "none";
   if (clean.length <= max) return clean.join(", ");
   return `${clean.slice(0, max).join(", ")} and ${clean.length - max} more`;
+}
+
+/** "1 script", "3 scripts". A bare number reads as a bug when it is a one. */
+function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
 }
 
 function yesNo(value: boolean | null | undefined): string {
@@ -173,6 +183,72 @@ function factsFor(id: string, data: unknown): Fact[] {
       ];
     }
 
+    case "dns-aliases": {
+      const d = data as DnsAliasesData;
+      const internal = d.srv.filter((r) => r.internalLooking).length;
+      return [
+        {
+          label: "CNAME",
+          // The target is the fact worth showing, not just "yes". Where the
+          // host is really served from is the whole answer to the first
+          // question, and a reader who sees only "yes" has to open the
+          // evidence list to learn it.
+          value: d.cname.target ?? "none, served from its own name",
+        },
+        {
+          label: "Leaves the domain",
+          // A host with no CNAME has nothing to leave, so the row says that
+          // rather than "not reported". The two read completely differently:
+          // one is a fact about the host, the other looks like a gap in the
+          // scan, and a reader has no way to tell them apart from the word
+          // alone.
+          value: d.cname.present ? yesNo(d.cname.leavesDomain) : "no alias to leave",
+        },
+        {
+          label: "Service records",
+          value:
+            d.srv.length === 0
+              ? "none"
+              : `${d.srv.length}${internal > 0 ? `, ${internal} to an internal name` : ""}`,
+          tone: internal > 0 ? "tone-warn" : undefined,
+        },
+      ];
+    }
+
+    case "nameservers": {
+      const d = data as NameserversData;
+      // The networks are the point of this check, so they get a row rather
+      // than being left to the evidence list. A zone delegated to two servers
+      // on one AS is a different fact from two on separate ASes, and only the
+      // ASN column shows which it is.
+      const networks = [...new Set(d.nameservers.map((n) => n.asn).filter((a): a is string => Boolean(a)))];
+      return [
+        { label: "Nameservers", value: plural(d.count, "server") },
+        {
+          label: "Networks",
+          value:
+            networks.length === 0
+              ? "none identified"
+              : networks.length <= 2
+                ? networks.join(", ")
+                : `${networks.slice(0, 2).join(", ")} and ${networks.length - 2} more`,
+        },
+        {
+          label: "DNS separate from site",
+          // Three outcomes, not two: independent, shared, and not determinable.
+          // A "no" here would read as a defect when it often means the
+          // provider simply hosts both, so the undetermined case says so.
+          value:
+            d.independentDns
+              ? "yes"
+              : d.siteAsn === null
+                ? "not determinable"
+                : "shared network",
+          tone: d.independentDns ? "tone-pass" : undefined,
+        },
+      ];
+    }
+
     case "ct-logs": {
       const d = data as CtData;
       return [
@@ -187,7 +263,10 @@ function factsFor(id: string, data: unknown): Fact[] {
         { label: "Newest", value: date(d.newest) },
         { label: "Oldest", value: date(d.oldest) },
         {
-          label: "Longest validity",
+          // Only certificates issued after the 2020 cap are eligible, so the
+          // label names that population. A bare "Longest validity" invited the
+          // reader to compare it against a 2015 ten-year certificate.
+          label: "Longest since 2020",
           value: d.longestValidityDays > 0 ? `${d.longestValidityDays} days` : NONE,
         },
         { label: "Hostnames seen", value: d.hostnames.length.toLocaleString("en-US") },
@@ -282,7 +361,16 @@ function factsFor(id: string, data: unknown): Fact[] {
         },
         {
           label: "DKIM selectors",
-          value: dkim.length > 0 ? list(dkim, 3) : "none found",
+          // A wildcard under _domainkey makes every selector resolve, so the
+          // selector list carries no information: it is one record echoed back
+          // for names nobody uses. Printing "none found" would be wrong too,
+          // because the zone does answer, so the row states what is actually
+          // there and why the per-selector list is empty.
+          value: d.wildcard
+            ? "wildcard, no per-selector key"
+            : dkim.length > 0
+              ? list(dkim, 3)
+              : "none found",
         },
         {
           label: "MTA-STS",
@@ -307,14 +395,22 @@ function factsFor(id: string, data: unknown): Fact[] {
 
     case "infrastructure": {
       const d = data as ExposureData;
+      const located = Boolean(d.geo.asn || d.geo.org || d.geo.city || d.geo.country);
+      const location = [d.geo.city, d.geo.country].filter(Boolean).join(", ");
+      // The geolocation source rate limits by IP, so a null here is usually a
+      // 429 rather than an address with no owner. Saying so is better than
+      // printing four empty rows, which read as though the address is unknown.
       return [
         { label: "Address", value: <span className="mono">{d.geo.ip ?? NONE}</span> },
-        { label: "Network", value: d.geo.asn ?? NONE },
-        { label: "Organisation", value: d.geo.org ?? NONE },
-        {
-          label: "Location",
-          value: [d.geo.city, d.geo.country].filter(Boolean).join(", ") || NONE,
-        },
+        located
+          ? { label: "Network", value: d.geo.asn ?? NONE }
+          : { label: "Network", value: "the geolocation source did not answer" },
+        ...(located
+          ? [
+              { label: "Organisation", value: d.geo.org ?? NONE },
+              { label: "Location", value: location || NONE },
+            ]
+          : []),
         {
           label: "Open ports",
           value:
@@ -326,6 +422,51 @@ function factsFor(id: string, data: unknown): Fact[] {
               : d.internetdb.available
                 ? "none reported"
                 : "not scanned",
+        },
+      ];
+    }
+
+    case "cohosted": {
+      const d = data as CohostedData;
+      // "1 domains" beside "10 hostnames" makes a reader doubt both numbers.
+      const domains = (n: number): string => `${n} domain${n === 1 ? "" : "s"}`;
+      return [
+        { label: "Address", value: <span className="mono">{d.ip ?? NONE}</span> },
+        {
+          label: "Other hostnames",
+          // The record count and the deduplicated count differ, and only the
+          // second is the number of names. Printing the raw count would inflate
+          // it, so the cap is shown as the reason rather than as the value.
+          value:
+            d.totalHostnames === 0
+              ? "none recorded"
+              : d.cappedAt500
+                ? `${d.totalHostnames} or more, at the cap`
+                : String(d.totalHostnames),
+        },
+        {
+          label: "Unrelated to this site",
+          // A shared edge and a small box both have unrelated neighbours, so the
+          // verdict is what separates them. Saying only the count invites the
+          // reader to treat a CDN edge as a cluster of compromised neighbours.
+          // Neither case carries a warning tone: the check itself reports no
+          // finding, because sharing an address is not a defect, and a colour
+          // here would contradict the sentence the check wrote.
+          value:
+            d.unrelatedCount === 0
+              ? "none"
+              : d.sharedAddress
+                ? `${domains(d.unrelatedDomains)}, on a shared edge`
+                : d.cdnTagged
+                  ? `${domains(d.unrelatedDomains)}, on a CDN edge`
+                  : `${domains(d.unrelatedDomains)}, on a small address`,
+        },
+        { label: "Network", value: d.network ?? NONE },
+        {
+          // Which sources actually answered changes how much the list above can
+          // be trusted, so it is a row rather than a footnote.
+          label: "Sources",
+          value: d.otxAnswered ? (d.fromInternetDb > 0 ? "OTX and Shodan" : "OTX") : "Shodan only",
         },
       ];
     }
@@ -354,7 +495,9 @@ function factsFor(id: string, data: unknown): Fact[] {
         },
         {
           label: "Catalogue",
-          value: d.catalogSize ? d.catalogSize.toLocaleString("en-US") + " entries" : NONE,
+          value: d.catalogSize
+            ? `${d.catalogSize.toLocaleString("en-US")} entr${d.catalogSize === 1 ? "y" : "ies"}`
+            : NONE,
         },
       ];
     }
@@ -371,8 +514,14 @@ function factsFor(id: string, data: unknown): Fact[] {
 
     case "tech-stack": {
       const d = data as TechStackData;
+      const count = d.items.length;
       return [
-        { label: "Detected", value: `${d.items.length} technologies` },
+        {
+          label: "Detected",
+          // "1 technologies" was shipped, which is the kind of thing a reader
+          // notices immediately and then distrusts the rest of the page for.
+          value: `${count} ${count === 1 ? "technology" : "technologies"}`,
+        },
         { label: "Server", value: d.server ?? NONE },
         { label: "Powered by", value: d.poweredBy ?? NONE },
         {
@@ -387,13 +536,44 @@ function factsFor(id: string, data: unknown): Fact[] {
 
     case "threat-intel": {
       const d = data as ThreatIntelData;
+      const validations = Array.from(new Set(d.validations.map((v) => v.name)));
       return [
         { label: "Pulses", value: String(d.pulses) },
-        { label: "Tags", value: list(d.tags, 3) },
+        {
+          label: "Tags",
+          // The tags are free text and most of them are ingestion noise: dates,
+          // street addresses, file-format words. Taking the first three after a
+          // sort prints exactly that noise, so this row reports how many there
+          // are and leaves the ranking to the finding, which filters first.
+          value:
+            d.tags.length === 0
+              ? "none"
+              : `${d.tags.length.toLocaleString("en-US")} distinct, ranked in the finding`,
+        },
         { label: "Whitelisted", value: yesNo(d.whitelisted) },
         {
           label: "Corroborated by",
-          value: d.validations.length > 0 ? list(d.validations.map((v) => v.name), 3) : "no one",
+          value: validations.length > 0 ? list(validations, 3) : "no one",
+        },
+      ];
+    }
+
+    case "malware-listings": {
+      const d = data as MalwareListingsData;
+      const listed = d.sources.filter((s) => s.outcome === "listed");
+      return [
+        {
+          label: "Feeds answered",
+          // The denominator is the point. "1 of 3" and "3 of 3" are a partial
+          // and a complete answer to the same question, and a bare count of
+          // listings would not distinguish them.
+          value: `${d.answeredCount} of ${d.totalSources}`,
+          tone: d.answeredCount === d.totalSources ? undefined : "tone-warn",
+        },
+        {
+          label: "Listing this site",
+          value: listed.length === 0 ? "none" : list(listed.map((s) => s.name), 2),
+          tone: listed.length > 0 ? "tone-warn" : undefined,
         },
       ];
     }
@@ -459,9 +639,18 @@ function factsFor(id: string, data: unknown): Fact[] {
 
     case "archive-history": {
       const d = data as ArchiveData;
+      // "not reported" for a first capture reads as a fact about the archive.
+      // When the query itself failed the archive never said anything, and the
+      // row has to distinguish that from a site that genuinely has one capture.
       return [
-        { label: "First capture", value: date(d.firstCapture) },
-        { label: "Latest capture", value: date(d.lastCapture) },
+        {
+          label: "First capture",
+          value: d.firstQueryFailed ? "the archive did not answer" : date(d.firstCapture),
+        },
+        {
+          label: "Latest capture",
+          value: d.lastQueryFailed ? "the archive did not answer" : date(d.lastCapture),
+        },
         {
           label: "Archived for",
           value: d.spanYears === null ? NONE : `${d.spanYears.toFixed(1)} years`,
@@ -530,6 +719,15 @@ function factsFor(id: string, data: unknown): Fact[] {
           value: `${d.images.missingAlt} of ${d.images.total}`,
           tone: d.images.missingAlt > 0 ? "tone-warn" : undefined,
         },
+        {
+          // Distinct hosts, not link count. A nav bar repeats one host many
+          // times, so the count says nothing about where the page points.
+          label: "Links out to",
+          value:
+            d.linkedHosts && d.linkedHosts.externalCount > 0
+              ? list(d.linkedHosts.external, 3)
+              : "no other host",
+        },
       ];
     }
 
@@ -563,16 +761,44 @@ function factsFor(id: string, data: unknown): Fact[] {
         { label: "Document", value: bytes(d.documentBytes) },
         {
           label: "Resources",
-          value: `${d.requests.scripts} scripts, ${d.requests.stylesheets} styles, ${d.requests.images} images`,
+          value: plural(d.requests.scripts, "script") + ", " + plural(d.requests.stylesheets, "stylesheet") + ", " + plural(d.requests.images, "image"),
         },
         {
           label: "Render blocking",
-          value: `${d.renderBlocking.scripts} scripts, ${d.renderBlocking.stylesheets} styles`,
+          value: plural(d.renderBlocking.scripts, "script") + ", " + plural(d.renderBlocking.stylesheets, "stylesheet"),
           tone:
             d.renderBlocking.scripts + d.renderBlocking.stylesheets > 0 ? "tone-warn" : undefined,
         },
         { label: "Compression", value: d.encoding ?? "none advertised" },
         { label: "DOM nodes", value: d.domNodes.toLocaleString("en-US") },
+      ];
+    }
+
+    case "carbon": {
+      const d = data as CarbonData;
+      return [
+        {
+          // "0 g" on its own reads as a measurement. The model's zero is its
+          // floor for a page light enough to round down, so the value says so
+          // rather than letting the reader take it literally.
+          label: "CO2 per view",
+          value:
+            d.gramsPerView === null
+              ? NONE
+              : d.belowFloor
+                ? "0 g, at the model's floor"
+                : `${d.gramsPerView.toFixed(2)} g`,
+        },
+        {
+          // The percentile counts pages that are dirtier, so 99 is good. A
+          // bare "99" beside a defect list would be read as a near-fail, so
+          // the label carries the direction instead of the number alone.
+          label: "Cleaner than",
+          value:
+            d.cleanerThanPercent === null
+              ? NONE
+              : `${d.cleanerThanPercent.toFixed(0)}% of pages measured`,
+        },
       ];
     }
 

@@ -53,7 +53,17 @@ function formatDate(iso: string): string {
   });
 }
 
+/**
+ * A check's own elapsed time.
+ *
+ * Several checks read a document or header set that another check already
+ * fetched, so they finish in under a millisecond and printed "0 ms", which
+ * reads as a broken measurement rather than as the reuse it is. The time is
+ * truthful; the label was not. Anything this fast did no waiting of its own,
+ * so it says so.
+ */
 function formatMs(ms: number): string {
+  if (ms < 2) return "reused a fetch";
   return ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms)} ms`;
 }
 
@@ -220,10 +230,12 @@ function CountTiles({ report }: { report: ScanReport }) {
       </ul>
       {extra > 0 && (
         <p style={{ marginTop: 8, fontSize: 12.5, color: "var(--muted-foreground)" }}>
-          {report.counts.info > 0 ? `${report.counts.info} informational` : ""}
+          {report.counts.info > 0
+            ? `${report.counts.info} informational`
+            : ""}
           {report.counts.info > 0 && report.counts.skipped > 0 ? " and " : ""}
-          {report.counts.skipped > 0 ? `${report.counts.skipped} skipped` : ""} checks are not
-          counted in the four boxes above.
+          {report.counts.skipped > 0 ? `${report.counts.skipped} skipped` : ""}{" "}
+          {extra === 1 ? "check is" : "checks are"} not counted in the four boxes above.
         </p>
       )}
     </section>

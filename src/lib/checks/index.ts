@@ -22,13 +22,18 @@ import { infrastructure } from "./infrastructure";
 import { subdomains } from "./subdomains";
 import { techStack } from "./tech-stack";
 import { threatIntel } from "./threat-intel";
+import { malwareListings } from "./malware-listings";
 import { performance } from "./performance";
+import { carbon } from "./carbon";
 import { darkPatterns } from "./dark-patterns";
 import { whois } from "./whois";
 import { dnsHygiene } from "./dns-hygiene";
+import { dnsAliases } from "./dns-aliases";
+import { nameservers } from "./nameservers";
 import { archiveHistory } from "./archive-history";
 import { popularity } from "./popularity";
 import { vulnerabilityExposure } from "./vulnerability-exposure";
+import { cohosted } from "./cohosted";
 import { certificateRevocation } from "./certificate-revocation";
 import { edgeProtection } from "./edge-protection";
 import { blocklist } from "./blocklist";
@@ -43,6 +48,8 @@ export const checks: CheckDefinition[] = [
   dnssec,
   whois,
   dnsHygiene,
+  dnsAliases,
+  nameservers,
   ctLogs,
   certificateRevocation,
   redirects,
@@ -51,10 +58,12 @@ export const checks: CheckDefinition[] = [
   emailAuth,
   securityTxt,
   infrastructure,
+  cohosted,
   vulnerabilityExposure,
   subdomains,
   techStack,
   threatIntel,
+  malwareListings,
   blocklist,
   breachHistory,
   archiveHistory,
@@ -63,6 +72,7 @@ export const checks: CheckDefinition[] = [
   markup,
   seo,
   performance,
+  carbon,
   darkPatterns,
 ];
 

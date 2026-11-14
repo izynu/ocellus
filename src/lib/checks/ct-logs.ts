@@ -18,7 +18,12 @@ type CtEntry = {
   common_name: string;
   name_value: string;
   id: number;
-  entry_timestamp: string;
+  /**
+   * No longer sent. A live query for example.com returned 81 entries and not
+   * one of them carried this key, so it is optional rather than a promise the
+   * response does not keep. issuanceTime() falls back to not_before.
+   */
+  entry_timestamp?: string;
   not_before: string;
   not_after: string;
   serial_number: string;
@@ -32,7 +37,13 @@ export type CtData = {
   notableHosts: string[];
   newest: string | null;
   oldest: string | null;
-  /** Longest validity period seen, in days. */
+  /**
+   * Longest validity, in days, among certificates from a trusted issuer that
+   * were issued after the 398-day cap took effect. This is the same population
+   * the long-validity finding judges, so the number and the finding always
+   * agree. Reporting the raw maximum showed "3650 days" from a test
+   * intermediate next to no finding at all.
+   */
   longestValidityDays: number;
   wildcards: string[];
 };
@@ -50,6 +61,49 @@ function validityDays(notBefore: string, notAfter: string): number {
   const end = Date.parse(notAfter);
   if (Number.isNaN(start) || Number.isNaN(end)) return 0;
   return Math.round((end - start) / 86_400_000);
+}
+
+/**
+ * When the certificate was issued.
+ *
+ * crt.sh used to return entry_timestamp, the moment the log accepted the
+ * certificate, and stopped: a live query for example.com returned 81 entries
+ * and not one of them carried the key. not_before is the certificate's own
+ * validity start rather than the log's entry time, so the two are not
+ * identical, but both date the issuance closely enough to rank certificates by
+ * age, and not_before is present on every entry. entry_timestamp stays first in
+ * the order so a response that brings it back is used as before.
+ */
+function issuanceTime(entry: CtEntry): number {
+  const logged = entry.entry_timestamp ? Date.parse(entry.entry_timestamp) : NaN;
+  if (!Number.isNaN(logged)) return logged;
+  return entry.not_before ? Date.parse(entry.not_before) : NaN;
+}
+
+/**
+ * Whether an issuer is a CA a browser could trust, which is the only kind of
+ * issuer worth judging against the validity cap.
+ *
+ * A live scan of example.com found two 3,650-day certificates that no browser
+ * trusts and that the site does not serve: one from 2023-01-27 whose
+ * issuer_name is the literal "Issuer Not Found" (crt.sh could not resolve the
+ * issuer at all), and one from 2021-08-31 issued by "AS207960 Test
+ * Intermediate - example.com". The finding built on them was a true statement
+ * about a junk log entry and a false implication about the site, so it is now
+ * judged only on entries that survive this filter.
+ */
+function isRealIssuer(issuer: string): boolean {
+  const raw = (issuer ?? "").trim();
+  if (!raw) return false;
+  // The placeholder crt.sh writes when its issuer lookup fails. It names a
+  // failed lookup rather than a CA.
+  if (/issuer not found/i.test(raw)) return false;
+  // Test intermediates, enterprise root names, and loopback or self-signed
+  // issuers appear in CT logs but issue nothing a browser accepts.
+  if (/test|certificate authority of|localhost|self.?signed/i.test(raw)) return false;
+  // caLabel can only produce a label from an O= or CN= component. A DN with
+  // neither yields nothing to name the CA with, and no public CA publishes one.
+  return /(^|,)\s*(O|CN)=/i.test(raw);
 }
 
 export const ctLogs: CheckDefinition = {
@@ -126,12 +180,14 @@ export const ctLogs: CheckDefinition = {
     const hostSet = new Set<string>();
     let newest: string | null = null;
     let oldest: string | null = null;
-    let longest = 0;
     /**
      * The longest-lived certificate issued on or after the 398-day cap took
      * effect, with its dates. Tracking only the global maximum missed the real
      * defect: a 2015 ten-year certificate outranked a 500-day certificate from
      * last year, so the one that actually violates the cap was never cited.
+     * Only entries whose issuer looks like a real CA are eligible, because a
+     * test intermediate with a ten-year validity is not a certificate the site
+     * serves and must not stand in for one.
      */
     const CUTOFF = Date.UTC(2020, 8, 1);
     let longestSinceCutoff = 0;
@@ -144,20 +200,20 @@ export const ctLogs: CheckDefinition = {
         const n = name.trim().toLowerCase();
         if (n) hostSet.add(n);
       }
-      if (e.entry_timestamp) {
-        const ts = Date.parse(e.entry_timestamp);
-        if (!Number.isNaN(ts)) {
-          const iso = new Date(ts).toISOString();
-          if (!newest || iso > newest) newest = iso;
-          if (!oldest || iso < oldest) oldest = iso;
-        }
+      const issuedAt = issuanceTime(e);
+      if (!Number.isNaN(issuedAt)) {
+        const iso = new Date(issuedAt).toISOString();
+        if (!newest || iso > newest) newest = iso;
+        if (!oldest || iso < oldest) oldest = iso;
       }
       const v = validityDays(e.not_before, e.not_after);
-      if (v > longest) {
-        longest = v;
-      }
       const issued = e.not_before ? Date.parse(e.not_before) : NaN;
-      if (v > longestSinceCutoff && !Number.isNaN(issued) && issued >= CUTOFF) {
+      if (
+        v > longestSinceCutoff &&
+        !Number.isNaN(issued) &&
+        issued >= CUTOFF &&
+        isRealIssuer(e.issuer_name)
+      ) {
         longestSinceCutoff = v;
         longestSinceCutoffEntry = e;
       }
@@ -216,7 +272,7 @@ export const ctLogs: CheckDefinition = {
         notableHosts: inDomain.slice(0, 40),
         newest,
         oldest,
-        longestValidityDays: longest,
+        longestValidityDays: longestSinceCutoff,
         wildcards,
       } satisfies CtData,
       ms: Math.round(performance.now() - started),

@@ -189,8 +189,13 @@ export const redirects: CheckDefinition = {
 
     const headline =
       hopCount === 0
-        ? `The request reaches ${finalDomain ?? ctx.target.domain} in a single response with no redirects.`
-        : `${hopCount} redirect${hopCount === 1 ? "" : "s"} before the final response${crossDomain ? `, ending on ${finalDomain}` : ""}${downgraded ? ", including an https to http downgrade" : ""}.`;
+        ? snapshot.challenge
+          ? // The hop list is real, but the destination is the edge's refusal,
+            // so "reaches the site in a single response" would describe a page
+            // the visitor never gets.
+            `No redirects were observed, and the request ended on an edge refusal (HTTP ${finalHop.status}) rather than the page.`
+          : `The request reaches ${finalDomain ?? ctx.target.domain} in a single response with no redirects.`
+        : `${hopCount} redirect${hopCount === 1 ? "" : "s"} before the final response${crossDomain ? `, ending on ${finalDomain}` : ""}${downgraded ? ", including an https to http downgrade" : ""}${snapshot.challenge ? `, which was an edge refusal (HTTP ${finalHop.status})` : ""}.`;
 
     return {
       id: this.id,

@@ -184,7 +184,13 @@ export const seo: CheckDefinition = {
         title: "No sitemap could be read",
         detail: declaredUrl
           ? `robots.txt declares ${declaredUrl}, but neither that file nor ${origin}/sitemap.xml could be read as a sitemap.`
-          : `Neither ${origin}/sitemap.xml nor a sitemap declared in robots.txt could be read.`,
+          : // Only claim a robots.txt was consulted when one was actually
+            // found. The earlier sentence said "nor a sitemap declared in
+            // robots.txt" for a site that publishes no robots.txt at all,
+            // which describes a search that could not have happened.
+            robotsFound
+            ? `Neither ${origin}/sitemap.xml nor a sitemap declared in robots.txt could be read.`
+            : `${origin}/sitemap.xml could not be read, and there is no robots.txt to declare one elsewhere.`,
         severity: "low",
         remediation: "Generate a sitemap and reference it from robots.txt.",
         reference: { label: "sitemaps.org", url: "https://www.sitemaps.org/protocol.html" },

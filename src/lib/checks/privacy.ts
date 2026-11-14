@@ -161,8 +161,10 @@ export const privacy: CheckDefinition = {
     // Without a header snapshot there are no Set-Cookie lines to judge. Reading
     // that absence as "this site sets no cookies" would be a clean verdict
     // awarded for a request that never succeeded, so the cookie half of the
-    // check is reported as unmeasured instead.
-    const headersAvailable = snapshot.via !== "unavailable" && snapshot.status !== 0;
+    // check is reported as unmeasured instead. An edge refusal counts the same
+    // way: the Set-Cookie lines in a challenge response belong to the challenge.
+    const headersAvailable =
+      snapshot.via !== "unavailable" && snapshot.status !== 0 && !snapshot.challenge;
     const rawCookies = headersAvailable
       ? headerAll(snapshot, "set-cookie").flatMap(splitSetCookieHeader)
       : [];
@@ -331,6 +333,12 @@ export const privacy: CheckDefinition = {
     }
 
     const serious = findings.filter((f) => f.severity === "high" || f.severity === "critical");
+    // The document half of this check is only meaningful when a document was
+    // read. `page.doc` is null when both the reader and the metadata fallback
+    // failed, and the tracker, third-party and mixed-content counts are then
+    // zero because nothing was examined, not because nothing was found. That
+    // cannot be a pass and cannot be a warn, so it is reported as information.
+    const docAvailable = page.doc !== null;
     const status: CheckResult["status"] =
       serious.length >= 2
         ? "fail"
@@ -339,7 +347,7 @@ export const privacy: CheckDefinition = {
           : // A clean verdict needs both halves to have run. With no header
             // snapshot, only the document was inspected, so the result is
             // reported as neutral information rather than a pass.
-            headersAvailable
+            headersAvailable && docAvailable
             ? "pass"
             : "info";
 
@@ -350,9 +358,11 @@ export const privacy: CheckDefinition = {
       status,
       headline: !headersAvailable
         ? `Response headers could not be read, so cookies are unmeasured. ${trackers.length} known tracker${trackers.length === 1 ? " is" : "s are"} referenced and ${thirdPartyHosts.size} third-party host${thirdPartyHosts.size === 1 ? " is" : "s are"} present in the document.`
-        : cookies.length === 0 && trackers.length === 0
-          ? "No cookies are set on the first response and no known trackers are referenced."
-          : `${cookies.length} cookie${cookies.length === 1 ? "" : "s"} on the first response, ${trackers.length} known tracker${trackers.length === 1 ? "" : "s"} referenced, ${thirdPartyHosts.size} third-party host${thirdPartyHosts.size === 1 ? "" : "s"} in total.`,
+        : !docAvailable
+          ? `${cookies.length} cookie${cookies.length === 1 ? "" : "s"} on the first response. The document could not be read, so trackers, third-party hosts and mixed content were not examined.`
+          : cookies.length === 0 && trackers.length === 0
+            ? "No cookies are set on the first response and no known trackers are referenced."
+            : `${cookies.length} cookie${cookies.length === 1 ? "" : "s"} on the first response, ${trackers.length} known tracker${trackers.length === 1 ? "" : "s"} referenced, ${thirdPartyHosts.size} third-party host${thirdPartyHosts.size === 1 ? "" : "s"} in total.`,
       findings,
       data: {
         cookies,

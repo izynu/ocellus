@@ -266,14 +266,32 @@ export const infrastructure: CheckDefinition = {
 
     const location = [geo.city, geo.country].filter(Boolean).join(", ");
 
+    // The address clause always ends in a full sentence, never in a bare
+    // address. Joining a bare IP to the port sentence produced
+    // "172.66.147.243. 11 ports observed open." whenever the geolocation source
+    // was silent, which reads as a typo in the address rather than as a missing
+    // lookup, and the address is the one value a reader will copy.
+    const hasContext = Boolean(location || geo.asn);
+    const addressSentence = !ip
+      ? "No address to look up."
+      : hasContext
+        ? `${ip}${location ? ` in ${location}` : ""}${geo.asn ? `, announced by ${geo.asn}${geo.org ? ` (${geo.org})` : ""}` : ""}.`
+        : `The address resolves to ${ip}.`;
+
+    const portSentence = !ip
+      ? ""
+      : internetdb.available
+        ? `${internetdb.ports.length} port${internetdb.ports.length === 1 ? "" : "s"} observed open.`
+        : internetdb.reason === "not-scanned"
+          ? "Shodan has no scan of this address."
+          : "Shodan could not be reached for this address.";
+
     return {
       id: this.id,
       title: this.title,
       question: this.question,
       status,
-      headline: ip
-        ? `${ip}${location ? ` in ${location}` : ""}${geo.asn ? `, announced by ${geo.asn}${geo.org ? ` (${geo.org})` : ""}` : ""}. ${internetdb.available ? `${internetdb.ports.length} port${internetdb.ports.length === 1 ? "" : "s"} observed open.` : internetdb.reason === "not-scanned" ? "Shodan has no scan of this address." : "Shodan could not be reached for this address."}`
-        : "No address to look up.",
+      headline: `${addressSentence}${portSentence ? ` ${portSentence}` : ""}`,
       findings,
       data: { geo, internetdb, hostingProvider } satisfies ExposureData,
       ms: Math.round(performance.now() - started),

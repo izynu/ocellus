@@ -13,6 +13,13 @@
  * usually new, private, or crawler-blocked, and none of those is a defect. A
  * site whose record begins recently but whose domain is old is worth a reader's
  * attention, because that is the shape of a domain that was reused.
+ *
+ * The endpoint answers "nothing here" and "I could not answer" with the same
+ * empty snapshot list, and it puts its own failures in the body of a 200. So
+ * each query carries an ok flag out of `closestCapture`, and a null date is
+ * only read as an absence when the query that produced it answered. A failure
+ * on one side leaves that side unknown and the result is information, not a
+ * verdict.
  */
 
 import type { CheckDefinition, CheckResult, Finding } from "../types";
@@ -27,6 +34,14 @@ type AvailabilityResponse = {
     };
   };
   timestamp?: string;
+  /**
+   * The endpoint reports its own failures in the body of a 200 response, for
+   * example `{"archived_snapshots":{},"error":{"code":"timeout","message":
+   * "client timeout at 5.0 seconds"}}`. Without this field an HTTP success with
+   * an error inside reads as "the archive holds nothing", which is a conclusion
+   * about the site drawn from a query that never answered.
+   */
+  error?: { code?: string; message?: string };
 };
 
 export type ArchiveData = {
@@ -40,6 +55,14 @@ export type ArchiveData = {
   snapshotUrl: string | null;
   /** HTTP status of the most recent capture, when reported. */
   lastStatus: string | null;
+  /**
+   * Set when the earliest-capture query failed, so `firstCapture` is null
+   * because the answer was not read rather than because the archive holds
+   * nothing. Optional so a consumer that predates this field still compiles.
+   */
+  firstQueryFailed?: boolean;
+  /** The same distinction for the most recent capture. */
+  lastQueryFailed?: boolean;
 };
 
 /** Wayback timestamps are YYYYMMDDhhmmss. */
@@ -67,6 +90,13 @@ async function closestCapture(
   );
 
   if (!res.ok || !res.json) {
+    return { iso: null, replayUrl: null, status: null, ok: false };
+  }
+
+  // A 200 carrying an error object is still a query that did not answer. The
+  // endpoint's 5-second client timeout arrives this way, and reading it as an
+  // empty archive is what turns a failed request into a false statement.
+  if (res.json.error) {
     return { iso: null, replayUrl: null, status: null, ok: false };
   }
 
@@ -117,8 +147,29 @@ export const archiveHistory: CheckDefinition = {
 
     const firstCapture = earliest.iso;
     const lastCapture = latest.iso;
+    const firstFailed = !earliest.ok;
+    const lastFailed = !latest.ok;
 
-    if (!firstCapture && !lastCapture) {
+    // The span is only a real measurement when the earliest date was read. It is
+    // null in the branches where that query failed, so those branches cannot
+    // carry a number that looks measured but is not.
+    const spanYears = firstCapture
+      ? Math.round(((Date.now() - Date.parse(firstCapture)) / (365.25 * 86_400_000)) * 10) / 10
+      : null;
+
+    // A link to the latest capture, from the endpoint when it gave one and from
+    // the timestamp when it only gave the date. Null whenever the latest query
+    // did not answer, because there is no capture to link to in that case.
+    const snapshotUrl =
+      latest.replayUrl ??
+      (toWaybackStamp(lastCapture)
+        ? `https://web.archive.org/web/${toWaybackStamp(lastCapture)}/${target}`
+        : null);
+
+    // "The archive holds nothing" is a statement about the site, so it is only
+    // made when both queries answered. A null from a failed query means the
+    // answer was not read, which is not the same thing.
+    if (!firstFailed && !lastFailed && !firstCapture && !lastCapture) {
       return {
         id: this.id,
         title: this.title,
@@ -132,6 +183,8 @@ export const archiveHistory: CheckDefinition = {
           spanYears: null,
           snapshotUrl: null,
           lastStatus: null,
+          firstQueryFailed: false,
+          lastQueryFailed: false,
         } satisfies ArchiveData,
         ms: Math.round(performance.now() - started),
         source: "Internet Archive Wayback availability API",
@@ -139,9 +192,60 @@ export const archiveHistory: CheckDefinition = {
       };
     }
 
-    const spanYears = firstCapture
-      ? Math.round(((Date.now() - Date.parse(firstCapture)) / (365.25 * 86_400_000)) * 10) / 10
-      : null;
+    // The earliest query did not answer. The latest one may still have, and
+    // that half is reported, but the headline may not extend to the half that
+    // did not answer: "no earlier capture" would be a conclusion drawn from a
+    // request that failed. A partial answer is information, not a verdict.
+    if (firstFailed) {
+      return {
+        id: this.id,
+        title: this.title,
+        question: this.question,
+        status: "info",
+        headline: lastCapture
+          ? `The most recent capture is on ${lastCapture.slice(0, 10)}, but the earliest capture could not be determined because the archive did not answer that query.`
+          : `The archive reported no capture at the present, and the query for the earliest capture did not answer, so the start of the record is unknown.`,
+        findings: [],
+        data: {
+          firstCapture: null,
+          lastCapture,
+          spanYears: null,
+          snapshotUrl,
+          lastStatus: latest.status,
+          firstQueryFailed: true,
+          lastQueryFailed: false,
+        } satisfies ArchiveData,
+        ms: Math.round(performance.now() - started),
+        source: "Internet Archive Wayback availability API",
+        note: "The query for the earliest capture did not answer, so the start of the record is unknown. That is a gap in this check, not a fact about the site; re-running usually answers.",
+      };
+    }
+
+    // The same treatment for the most recent capture.
+    if (lastFailed) {
+      return {
+        id: this.id,
+        title: this.title,
+        question: this.question,
+        status: "info",
+        headline: firstCapture
+          ? `The earliest capture is on ${firstCapture.slice(0, 10)}, but the most recent capture could not be determined because the archive did not answer that query.`
+          : `The archive reported no capture at the start of the web, and the query for the most recent capture did not answer, so the end of the record is unknown.`,
+        findings: [],
+        data: {
+          firstCapture,
+          lastCapture: null,
+          spanYears,
+          snapshotUrl: null,
+          lastStatus: null,
+          firstQueryFailed: false,
+          lastQueryFailed: true,
+        } satisfies ArchiveData,
+        ms: Math.round(performance.now() - started),
+        source: "Internet Archive Wayback availability API",
+        note: "The query for the most recent capture did not answer, so the end of the record is unknown. That is a gap in this check, not a fact about the site; re-running usually answers.",
+      };
+    }
 
     const findings: Finding[] = [];
 
@@ -163,8 +267,10 @@ export const archiveHistory: CheckDefinition = {
     // The comparison is only made when the registration date is known, because
     // "the archive starts recently" means nothing without something to compare
     // it to. A registration older than the archive by two years or more is the
-    // reusable-domain shape.
-    if (firstCapture && registration) {
+    // reusable-domain shape. Both dates must come from queries that answered:
+    // a failed query leaves `firstCapture` null, and a gap computed from a date
+    // that was never read would be a finding built on a missing answer.
+    if (!firstFailed && !lastFailed && firstCapture && registration) {
       const gapDays = Math.round(
         (Date.parse(firstCapture) - Date.parse(registration)) / 86_400_000
       );
@@ -182,9 +288,14 @@ export const archiveHistory: CheckDefinition = {
 
     const status: CheckResult["status"] = findings.length > 0 ? "warn" : "info";
 
+    // Reached only when both queries answered, so neither date is null because
+    // of a failure. A query can still answer "nothing here", and that case is
+    // described as what it is rather than filled in with an invented date.
     const headline = firstCapture
-      ? `Archived since ${firstCapture.slice(0, 10)}, with the most recent capture on ${lastCapture?.slice(0, 10) ?? "an unknown date"}${spanYears !== null ? `, a record spanning ${spanYears} years` : ""}.`
-      : "The archive reports a recent capture but no earlier one.";
+      ? lastCapture
+        ? `Archived since ${firstCapture.slice(0, 10)}, with the most recent capture on ${lastCapture.slice(0, 10)}${spanYears !== null ? `, a record spanning ${spanYears} years` : ""}.`
+        : `The archive holds a capture from ${firstCapture.slice(0, 10)}, but none close to the present.`
+      : `The archive holds a recent capture of ${ctx.target.host}, but none close to the start of the web.`;
 
     return {
       id: this.id,
@@ -197,12 +308,10 @@ export const archiveHistory: CheckDefinition = {
         firstCapture,
         lastCapture,
         spanYears,
-        snapshotUrl:
-          latest.replayUrl ??
-          (toWaybackStamp(lastCapture)
-            ? `https://web.archive.org/web/${toWaybackStamp(lastCapture)}/${target}`
-            : null),
+        snapshotUrl,
         lastStatus: latest.status,
+        firstQueryFailed: false,
+        lastQueryFailed: false,
       } satisfies ArchiveData,
       ms: Math.round(performance.now() - started),
       source: "Internet Archive Wayback availability API",
