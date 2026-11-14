@@ -156,6 +156,9 @@ ErrorDocument 404 /404.html
   Header always set X-Frame-Options "DENY"
   Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
   Header always set Cross-Origin-Opener-Policy "same-origin"
+  # Set explicitly rather than left to the default: the scanner grades this
+  # header, so the site has to send it or it fails its own check.
+  Header always set Cross-Origin-Resource-Policy "same-origin"
   # Next's static export uses inline bootstrap scripts, so 'unsafe-inline' is
   # required for script-src. Everything else is locked to this origin.
   Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://dns.google https://cloudflare-dns.com https://crt.sh https://api.hackertarget.com https://r.jina.ai https://api.microlink.io https://internetdb.shodan.io https://ipwho.is https://otx.alienvault.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests"
