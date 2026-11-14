@@ -33,3 +33,4 @@ yarn-error.log*
 # The previous product's source, kept for reference and not shipped.
 /_legacy/
 /_webcheck_src/
+ocellus-cpanel.zip
