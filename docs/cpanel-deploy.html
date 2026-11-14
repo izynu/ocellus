@@ -1,0 +1,371 @@
+<title>Ocellus cPanel Deploy</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: one measured column. The rail is omitted on purpose: a runbook is
+     read top to bottom, in order, and a jump list invites skipping step 4. */
+  :root {
+    --bg: #f7f7f4;
+    --surface: #ffffff;
+    --surface-2: #f0f0ec;
+    --fg: #1a1d1b;
+    --fg-muted: #5a625d;
+    --border: #dcdcd5;
+    --border-strong: #c4c6bd;
+    --accent: #0d5c4d;
+    --accent-fg: #ffffff;
+    --accent-soft: #e3efeb;
+    --warn: #8a5a00;
+    --warn-soft: #fbf1dc;
+    --danger: #96322b;
+    --danger-soft: #fbeae8;
+    --code-bg: #1e2320;
+    --code-fg: #dfe6e1;
+    --code-cap: #93a79c;
+    --radius: 10px;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121513;
+      --surface: #191d1a;
+      --surface-2: #20251f;
+      --fg: #e8ece8;
+      --fg-muted: #9aa49d;
+      --border: #2c322d;
+      --border-strong: #3c443e;
+      --accent: #4fbfa3;
+      --accent-fg: #06201a;
+      --accent-soft: #17322b;
+      --warn: #d9a441;
+      --warn-soft: #2e2614;
+      --danger: #e0736a;
+      --danger-soft: #331a17;
+      --code-bg: #0d100e;
+      --code-fg: #cfe0d6;
+      --code-cap: #7f9488;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121513;
+    --surface: #191d1a;
+    --surface-2: #20251f;
+    --fg: #e8ece8;
+    --fg-muted: #9aa49d;
+    --border: #2c322d;
+    --border-strong: #3c443e;
+    --accent: #4fbfa3;
+    --accent-fg: #06201a;
+    --accent-soft: #17322b;
+    --warn: #d9a441;
+    --warn-soft: #2e2614;
+    --danger: #e0736a;
+    --danger-soft: #331a17;
+    --code-bg: #0d100e;
+    --code-fg: #cfe0d6;
+    --code-cap: #7f9488;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.62;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 860px;
+    margin: 0 auto;
+    padding-block: 56px 96px;
+  }
+
+  /* ---- masthead ---- */
+  .mast { display: flex; flex-direction: column; gap: 14px; padding-bottom: 28px; border-bottom: 1px solid var(--border); }
+  .kicker {
+    font-size: 11.5px; font-weight: 600; letter-spacing: 0.13em; text-transform: uppercase;
+    color: var(--accent); display: flex; align-items: center; gap: 8px;
+  }
+  .kicker::before { content: ""; width: 22px; height: 2px; background: var(--accent); border-radius: 1px; }
+  h1 { margin: 0; font-size: clamp(30px, 5vw, 42px); line-height: 1.1; letter-spacing: -0.025em; font-weight: 700; text-wrap: balance; }
+  .lede { margin: 0; max-width: 62ch; color: var(--fg-muted); font-size: 17px; }
+  .facts { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 6px; font-size: 13px; color: var(--fg-muted); }
+  .facts b { color: var(--fg); font-weight: 600; }
+
+  /* ---- sections ---- */
+  section { padding-top: 44px; }
+  h2 {
+    margin: 0 0 4px; font-size: 13px; font-weight: 650; letter-spacing: 0.11em;
+    text-transform: uppercase; color: var(--fg-muted);
+    display: flex; align-items: baseline; gap: 10px;
+  }
+  h2 .n { font-family: var(--mono); font-size: 12px; color: var(--accent); letter-spacing: 0; }
+  h3 { margin: 26px 0 8px; font-size: 19px; font-weight: 640; letter-spacing: -0.015em; text-wrap: balance; }
+  p { margin: 10px 0; max-width: 68ch; }
+  ul, ol { margin: 10px 0; padding-left: 22px; max-width: 68ch; }
+  li { margin: 6px 0; }
+  li::marker { color: var(--fg-muted); }
+  code {
+    font-family: var(--mono); font-size: 0.875em;
+    background: var(--surface-2); border: 1px solid var(--border);
+    padding: 1px 5px; border-radius: 5px; overflow-wrap: anywhere;
+  }
+  strong { font-weight: 640; }
+  a { color: var(--accent); text-underline-offset: 3px; }
+
+  /* ---- code blocks ---- */
+  .code {
+    position: relative; margin: 14px 0; border-radius: var(--radius);
+    background: var(--code-bg); color: var(--code-fg);
+    border: 1px solid var(--border-strong);
+    overflow-x: auto;
+  }
+  .code pre { margin: 0; padding: 15px 16px; font-family: var(--mono); font-size: 13px; line-height: 1.6; }
+  .code .cap {
+    display: block; padding: 8px 16px; font-family: var(--sans); font-size: 11px;
+    letter-spacing: 0.09em; text-transform: uppercase; color: var(--code-cap);
+    border-bottom: 1px solid var(--border-strong);
+  }
+
+  /* ---- callouts ---- */
+  .note {
+    display: flex; gap: 12px; margin: 16px 0; padding: 13px 15px;
+    border-radius: var(--radius); border: 1px solid var(--border);
+    background: var(--surface); font-size: 14.5px;
+  }
+  .note .bar { flex: 0 0 3px; border-radius: 2px; background: var(--border-strong); }
+  .note p { margin: 0; max-width: none; }
+  .note.warn { background: var(--warn-soft); border-color: color-mix(in srgb, var(--warn) 30%, transparent); }
+  .note.warn .bar { background: var(--warn); }
+  .note.warn strong { color: var(--warn); }
+  .note.danger { background: var(--danger-soft); border-color: color-mix(in srgb, var(--danger) 30%, transparent); }
+  .note.danger .bar { background: var(--danger); }
+  .note.danger strong { color: var(--danger); }
+  .note.ok { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 26%, transparent); }
+  .note.ok .bar { background: var(--accent); }
+
+  /* ---- file tree ---- */
+  .tree {
+    margin: 14px 0; padding: 15px 16px; border-radius: var(--radius);
+    background: var(--surface); border: 1px solid var(--border);
+    font-family: var(--mono); font-size: 13px; line-height: 1.75;
+    overflow-x: auto; white-space: pre;
+  }
+  .tree .d { color: var(--accent); font-weight: 500; }
+  .tree .c { color: var(--fg-muted); }
+
+  /* ---- table ---- */
+  .tblwrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--border); border-radius: var(--radius); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 460px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-muted); font-weight: 600; background: var(--surface-2); }
+  tr:last-child td { border-bottom: 0; }
+  td code { white-space: nowrap; }
+
+  /* ---- step list ---- */
+  .steps { counter-reset: step; list-style: none; padding: 0; margin: 16px 0; display: grid; gap: 2px; }
+  .steps > li {
+    counter-increment: step; position: relative;
+    padding: 14px 0 14px 46px; margin: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .steps > li:last-child { border-bottom: 0; }
+  .steps > li::before {
+    content: counter(step); position: absolute; left: 0; top: 13px;
+    width: 28px; height: 28px; border-radius: 7px;
+    display: grid; place-items: center;
+    background: var(--accent-soft); color: var(--accent);
+    font-family: var(--mono); font-size: 12.5px; font-weight: 500;
+  }
+  .steps b { display: block; font-weight: 640; margin-bottom: 2px; }
+  .steps p { margin: 0; color: var(--fg-muted); font-size: 14.5px; }
+
+  /* ---- check grid ---- */
+  .checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; margin: 16px 0; }
+  .check {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 11px 13px; border-radius: 9px;
+    background: var(--surface); border: 1px solid var(--border);
+    font-size: 13.5px;
+  }
+  .check .dot {
+    flex: 0 0 16px; width: 16px; height: 16px; border-radius: 50%; margin-top: 2px;
+    border: 1.5px solid var(--accent); background: var(--accent); position: relative;
+  }
+  .check .dot::after {
+    content: ""; position: absolute; inset: 4.5px; border-radius: 50%; background: var(--accent-fg);
+  }
+  .check .lbl { min-width: 0; }
+  .check .lbl b { display: block; font-weight: 550; font-family: var(--mono); font-size: 12.5px; overflow-wrap: anywhere; }
+  .check .lbl span { color: var(--fg-muted); font-size: 12.5px; }
+
+  footer { margin-top: 64px; padding-top: 22px; border-top: 1px solid var(--border); color: var(--fg-muted); font-size: 13px; display: flex; flex-wrap: wrap; gap: 8px 20px; justify-content: space-between; }
+
+  @media (max-width: 560px) {
+    .wrap { padding-block: 36px 64px; }
+    body { font-size: 15.5px; }
+    .steps > li { padding-left: 40px; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="mast">
+    <div class="kicker">Deployment runbook</div>
+    <h1>Uploading Ocellus to cPanel</h1>
+    <p class="lede">A static site needs no PHP, no database and no build step on the server. You upload one folder into <code>public_html</code>, confirm the domain points at it, and the site is live.</p>
+    <div class="facts">
+      <span>Build output <b>75 files, 2.1 MB</b></span>
+      <span>Server needs <b>Apache with mod_rewrite</b></span>
+      <span>Upload time <b>2 to 5 minutes</b></span>
+    </div>
+  </header>
+
+  <section>
+    <h2><span class="n">01</span> What you are uploading</h2>
+    <p>The build produces a plain directory of files. Everything the browser needs is already in it: HTML, CSS, JavaScript, fonts and icons. Nothing is compiled on the server.</p>
+    <div class="tree"><span class="d">dist/cpanel/</span>              <span class="c">75 files, 2.1 MB</span>
+├── index.html          <span class="c">the home page</span>
+├── scan/index.html     <span class="c">the scanner, one directory per route</span>
+├── checks/index.html
+├── method/index.html
+├── about/index.html
+├── privacy/index.html
+├── terms/index.html
+├── 404.html            <span class="c">served by ErrorDocument</span>
+├── .htaccess           <span class="c">HTTPS, headers, caching, rewrites</span>
+├── _next/static/       <span class="c">hashed CSS, JS, fonts and build manifests</span>
+├── *.txt               <span class="c">route payloads Next fetches on navigation</span>
+├── favicon.ico  icon.svg  apple-icon.png
+├── icon-16.png ... icon-512.png
+├── og.png  manifest.webmanifest
+└── robots.txt  sitemap.xml</div>
+    <p>The <code>.txt</code> files sit beside each page and hold that route's data. They are part of the build, not leftovers, so upload them with everything else. Missing them does not break a page load, but moving between pages stops working.</p>
+    <div class="note ok"><span class="bar"></span><p><strong>Upload the contents, not the folder.</strong> The files inside <code>dist/cpanel/</code> go directly into <code>public_html</code>. If you upload the folder itself you get <code>public_html/cpanel/index.html</code> and the site appears at <code>/cpanel/</code> instead of the root.</p></div>
+  </section>
+
+  <section>
+    <h2><span class="n">02</span> Upload with File Manager</h2>
+    <ol class="steps">
+      <li><b>Build the folder on your own machine</b><p>Run <code>npm run build:cpanel</code> and take the <code>dist/cpanel</code> folder. There is nothing to install on the host.</p></li>
+      <li><b>Zip it before uploading</b><p>Compress the <em>contents</em> of <code>dist/cpanel</code> into one <code>.zip</code>. A single archive uploads far faster than 75 separate files, and cPanel extracts it in place.</p></li>
+      <li><b>Open File Manager and go to public_html</b><p>In cPanel, choose <em>File Manager</em>, then open the <code>public_html</code> directory. This is the document root your domain serves.</p></li>
+      <li><b>Clear the default placeholder files</b><p>New accounts often contain a <code>default.html</code> or a <code>cgi-bin</code> folder. Remove <code>default.html</code> so it does not shadow your <code>index.html</code>. Leave <code>cgi-bin</code> alone if it exists.</p></li>
+      <li><b>Upload the archive and extract</b><p>Use <em>Upload</em>, then right-click the uploaded <code>.zip</code> and choose <em>Extract</em>. Confirm the files land directly in <code>public_html</code>, not in a subfolder.</p></li>
+      <li><b>Delete the archive</b><p>Remove the <code>.zip</code> once extraction finishes so it is not publicly downloadable.</p></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2><span class="n">03</span> Upload over FTP or SFTP</h2>
+    <p>Use the FTP details from cPanel under <em>FTP Accounts</em>. SFTP on port 22 is preferable to plain FTP when the host offers it.</p>
+    <div class="code"><span class="cap">Terminal, from the project root</span><pre>cd dist/cpanel
+
+# SFTP (preferred). Replace with your host, user and path.
+sftp user@yourdomain.tld
+  put -r * public_html/
+
+# or with rsync, which resumes and skips unchanged files
+rsync -avz --delete ./ user@yourdomain.tld:public_html/</pre></div>
+    <div class="note warn"><span class="bar"></span><p><strong>The .htaccess file is hidden.</strong> Most FTP clients hide dotfiles by default. Turn on "show hidden files" before you upload or the server will send no security headers and every route will 404. With <code>rsync</code> it is included automatically.</p></div>
+  </section>
+
+  <section>
+    <h2><span class="n">04</span> Point the domain at the folder</h2>
+    <p>In cPanel under <em>Domains</em> (or <em>Addon Domains</em> for a second site), confirm the domain's document root is the folder you uploaded into. For the main domain that is <code>public_html</code>.</p>
+    <p>If you are adding this as an extra site on a shared plan, create it as an addon domain, which gives it its own folder, and upload there instead. Do not point two domains at the same document root.</p>
+    <h3>Then enable HTTPS</h3>
+    <p>Under <em>SSL/TLS Status</em>, run <strong>AutoSSL</strong> for the domain and wait for it to issue. The site forces HTTPS in <code>.htaccess</code>, so a request that arrives before the certificate exists will loop. Issue the certificate first.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">05</span> Confirm the server has what the site needs</h2>
+    <p>Two Apache modules do the real work. Most shared hosts enable both, but check rather than assume.</p>
+    <div class="tblwrap"><table>
+      <thead><tr><th>Module</th><th>Used for</th><th>If it is missing</th></tr></thead>
+      <tbody>
+        <tr><td><code>mod_rewrite</code></td><td>HTTPS redirect and <code>/path/</code> to <code>/path/index.html</code></td><td>Clean URLs 404. Ask the host to enable it.</td></tr>
+        <tr><td><code>mod_headers</code></td><td>The eight security headers the scanner grades</td><td>Pages load but grade poorly. Ask the host to enable it.</td></tr>
+        <tr><td><code>mod_deflate</code></td><td>Compression</td><td>Optional. Pages still work, just larger.</td></tr>
+        <tr><td><code>mod_expires</code></td><td>Cache lifetime on assets</td><td>Optional. Browsers fall back to their own defaults.</td></tr>
+      </tbody>
+    </table></div>
+    <p>You can see which modules are loaded under cPanel's <em>Select PHP Version</em> or by asking the host's support. The <code>.htaccess</code> wraps each block in <code>&lt;IfModule&gt;</code>, so a missing module degrades quietly instead of returning a 500 error.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">06</span> Verify it worked</h2>
+    <p>Work down this list once the site is live. Each line is something you can check from a normal browser.</p>
+    <div class="checks">
+      <div class="check"><span class="dot"></span><span class="lbl"><b>https://yourdomain.tld</b><span>Loads the home page, no certificate warning</span></span></div>
+      <div class="check"><span class="dot"></span><span class="lbl"><b>http:// yourdomain</b><span>Redirects to https automatically</span></span></div>
+      <div class="check"><span class="dot"></span><span class="lbl"><b>/scan/</b><span>Loads directly, does not 404</span></span></div>
+      <div class="check"><span class="dot"></span><span class="lbl"><b>/scan</b><span>Adds the trailing slash and loads</span></span></div>
+      <div class="check"><span class="dot"></span><span class="lbl"><b>/nonexistent</b><span>Shows the styled 404 page</span></span></div>
+      <div class="check"><span class="dot"></span><span class="lbl"><b>/sitemap.xml</b><span>Returns XML, not the 404 page</span></span></div>
+      <div class="check"><span class="dot"></span><span class="lbl"><b>/robots.txt</b><span>Returns the crawl rules</span></span></div>
+      <div class="check"><span class="dot"></span><span class="lbl"><b>Favicon</b><span>Shows in the browser tab</span></span></div>
+    </div>
+    <h3>Check the headers</h3>
+    <p>The site grades its own header policy, so it should send all eight. From a terminal:</p>
+    <div class="code"><span class="cap">Terminal</span><pre>curl -sSI https://yourdomain.tld/ | grep -iE \
+  'strict-transport|x-content-type|x-frame|referrer-policy|permissions-policy|cross-origin|content-security'
+
+# Expect eight lines. Missing ones mean mod_headers is off,
+# or the .htaccess did not upload (hidden files).</pre></div>
+    <div class="note ok"><span class="bar"></span><p><strong>The strongest check:</strong> open <code>/scan/</code> on your own live domain and run it. It will audit exactly the deployment you just made. All eight headers should pass, HTTPS should show a single hop, and the canonical should match the host.</p></div>
+  </section>
+
+  <section>
+    <h2><span class="n">07</span> If something breaks</h2>
+    <div class="tblwrap"><table>
+      <thead><tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr><td>500 Internal Server Error</td><td>An <code>.htaccess</code> line the server does not allow</td><td>Rename <code>.htaccess</code> to <code>.htaccess.bak</code>. If the site loads, the cause is confirmed. Usually a <code>Header</code> or <code>Options</code> line the host forbids.</td></tr>
+        <tr><td>Directory listing instead of the site</td><td>Files extracted into a subfolder</td><td>Move the contents of that subfolder up into <code>public_html</code>.</td></tr>
+        <tr><td>Unstyled page, plain HTML</td><td><code>_next/</code> did not upload</td><td>Re-upload the <code>_next</code> folder. It holds every stylesheet and script.</td></tr>
+        <tr><td>Redirect loop</td><td>HTTPS rule fighting a proxy that already terminated TLS</td><td>The rule already tests <code>X-Forwarded-Proto</code>. If the host uses a different header, ask support which one it sets.</td></tr>
+        <tr><td>Routes 404, home page fine</td><td><code>mod_rewrite</code> off, or <code>.htaccess</code> missing</td><td>Enable the module, or re-upload the hidden <code>.htaccess</code>.</td></tr>
+        <tr><td>No security headers</td><td><code>mod_headers</code> off</td><td>Ask the host to enable it. The site still works, but scores lower.</td></tr>
+        <tr><td>Old content after an update</td><td>Browser cache on <code>index.html</code></td><td>Hard reload. HTML is served <code>must-revalidate</code>; hashed assets never change name, so they cache for a year safely.</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2><span class="n">08</span> Updating the site later</h2>
+    <p>Rebuild, then replace the contents of <code>public_html</code> with the new <code>dist/cpanel</code>. Hashed asset filenames change with every build, so old and new files can coexist during an upload without breaking anyone mid-download. The HTML files are the only ones that must be replaced together.</p>
+    <div class="code"><span class="cap">Terminal, from the project root</span><pre>npm run build:cpanel
+rsync -avz --delete dist/cpanel/ user@yourdomain.tld:public_html/</pre></div>
+    <div class="note"><span class="bar"></span><p><code>--delete</code> removes stale hashed assets from previous builds. Use it, but only against <code>public_html</code> itself and never a parent folder, because it deletes whatever is not in the source.</p></div>
+  </section>
+
+  <section>
+    <h2><span class="n">09</span> The GitHub Pages copy</h2>
+    <p>The same source tree produces a second deployable for GitHub Pages, differing only in the base path. It is not an upload: the workflow in <code>.github/workflows/deploy.yml</code> builds and publishes it whenever you push to <code>main</code>.</p>
+    <ol>
+      <li>Create the repository <code>izynu/ocellus</code> on GitHub and push this project to it.</li>
+      <li>Open <em>Settings</em>, then <em>Pages</em>, and set the source to <strong>GitHub Actions</strong>.</li>
+      <li>Push to <code>main</code>. The workflow builds <code>dist/pages</code> and deploys it.</li>
+      <li>The site appears at <code>https://izynu.github.io/ocellus/</code>.</li>
+    </ol>
+    <p>To serve it from your own domain instead, add a <code>CNAME</code> record and set the repository variable <code>SITE_URL</code> under <em>Settings</em>, then <em>Secrets and variables</em>, then <em>Actions</em>. The build reads it to write absolute URLs for the sitemap, canonical tags and social preview images.</p>
+    <div class="note warn"><span class="bar"></span><p><strong>GitHub Pages cannot set response headers.</strong> The Pages copy will not send the security headers the cPanel copy does, because Pages does not read <code>.htaccess</code> and offers no header configuration. Its score will be lower for that reason alone. If you want one canonical, fully graded deployment, use the cPanel host and point the domain there.</p></div>
+  </section>
+
+  <footer>
+    <span>Ocellus deployment runbook</span>
+    <span>Static export, no server-side runtime</span>
+  </footer>
+
+</div>

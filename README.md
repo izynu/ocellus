@@ -79,7 +79,7 @@ One source tree produces two deployables. The only difference is the base path.
 # Shared cPanel hosting: upload dist/cpanel/ to public_html
 NEXT_PUBLIC_SITE_URL=https://yourdomain.tld npm run build:cpanel
 
-# GitHub Pages: publishes dist/pages/ to the gh-pages environment
+# GitHub Pages: built and published by the workflow on push to main
 npm run build:pages
 ```
 
@@ -89,6 +89,8 @@ npm run build:pages
 | GitHub Pages | `dist/pages/` | `/<repo>` | Includes `.nojekyll`, deployed by the workflow in `.github/workflows/deploy.yml` |
 
 The cPanel build is a plain directory of static files. Upload the contents of `dist/cpanel/` into `public_html` with the file manager or over FTP. The `.htaccess` is generated from the template in [`scripts/build.mjs`](scripts/build.mjs) and sets the same header policy the scanner grades, so the site passes its own check.
+
+For the full procedure, including domain setup, AutoSSL, the Apache modules the site needs and what each failure mode looks like, open [`docs/cpanel-deploy.html`](docs/cpanel-deploy.html) in a browser.
 
 ## Project layout
 
