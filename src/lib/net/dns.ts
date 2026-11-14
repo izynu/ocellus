@@ -1,0 +1,181 @@
+/**
+ * DNS over HTTPS.
+ *
+ * A static page cannot open a DNS socket, so every record here comes from a
+ * JSON DoH endpoint. Google and Cloudflare both send
+ * `Access-Control-Allow-Origin: *` and both support the same JSON shape, so we
+ * use Google first and fall back to Cloudflare.
+ *
+ * Answers are cached per (name, type) because several checks want the same
+ * records: SPF lives in TXT, and both the email and domain checks read it.
+ */
+
+import type { NetClient } from "./client";
+
+export type DnsAnswer = {
+  name: string;
+  type: number;
+  ttl: number;
+  data: string;
+};
+
+export type DnsResponse = {
+  /** DoH status: 0 = NOERROR, 3 = NXDOMAIN, 2 = SERVFAIL, 5 = REFUSED. */
+  status: number;
+  answers: DnsAnswer[];
+  authority: DnsAnswer[];
+  /** True when the resolver validated DNSSEC for this answer. */
+  authenticated: boolean;
+  provider: string;
+};
+
+export type RecordType =
+  | "A"
+  | "AAAA"
+  | "CNAME"
+  | "MX"
+  | "NS"
+  | "TXT"
+  | "SOA"
+  | "CAA"
+  | "SRV"
+  | "PTR"
+  | "DS"
+  | "DNSKEY"
+  | "TLSA"
+  | "HTTPS";
+
+const TYPE_NAMES: Record<number, string> = {
+  1: "A",
+  2: "NS",
+  5: "CNAME",
+  6: "SOA",
+  12: "PTR",
+  15: "MX",
+  16: "TXT",
+  28: "AAAA",
+  33: "SRV",
+  43: "DS",
+  46: "RRSIG",
+  48: "DNSKEY",
+  52: "TLSA",
+  257: "CAA",
+  65: "HTTPS",
+};
+
+const PROVIDERS = [
+  { name: "Google Public DNS", url: "https://dns.google/resolve" },
+  { name: "Cloudflare 1.1.1.1", url: "https://cloudflare-dns.com/dns-query" },
+];
+
+export function typeName(code: number): string {
+  return TYPE_NAMES[code] ?? `TYPE${code}`;
+}
+
+type RawDoh = {
+  Status: number;
+  Answer?: Array<{ name: string; type: number; TTL: number; data: string }>;
+  Authority?: Array<{ name: string; type: number; TTL: number; data: string }>;
+  AD?: boolean;
+};
+
+export class DnsResolver {
+  private cache = new Map<string, Promise<DnsResponse>>();
+
+  constructor(private readonly net: NetClient) {}
+
+  query(name: string, type: RecordType): Promise<DnsResponse> {
+    const key = `${name.toLowerCase()}|${type}`;
+    const hit = this.cache.get(key);
+    if (hit) return hit;
+    const promise = this.resolve(name, type);
+    this.cache.set(key, promise);
+    return promise;
+  }
+
+  /** Convenience: the `data` strings for one record type. */
+  async values(name: string, type: RecordType): Promise<string[]> {
+    const res = await this.query(name, type);
+    return res.answers.filter((a) => a.type === TYPE_NAMES_REVERSE[type]).map((a) => a.data);
+  }
+
+  /** True when the name has any record of that type. */
+  async exists(name: string, type: RecordType): Promise<boolean> {
+    const res = await this.query(name, type);
+    return res.status === 0 && res.answers.length > 0;
+  }
+
+  private async resolve(name: string, type: RecordType): Promise<DnsResponse> {
+    let lastError: DnsResponse = {
+      status: -1,
+      answers: [],
+      authority: [],
+      authenticated: false,
+      provider: "none",
+    };
+
+    for (const provider of PROVIDERS) {
+      const url = `${provider.url}?name=${encodeURIComponent(name)}&type=${type}`;
+      const res = await this.net.json<RawDoh>(url, {
+        headers: { accept: "application/dns-json" },
+        timeoutMs: 9000,
+      });
+      if (!res.ok) {
+        lastError = { ...lastError, provider: provider.name };
+        continue;
+      }
+      const body = res.json as RawDoh;
+      if (!body || typeof body.Status !== "number") {
+        lastError = { ...lastError, provider: provider.name };
+        continue;
+      }
+      return {
+        status: body.Status,
+        answers: (body.Answer ?? []).map((a) => ({
+          name: a.name,
+          type: a.type,
+          ttl: a.TTL,
+          data: a.data,
+        })),
+        authority: (body.Authority ?? []).map((a) => ({
+          name: a.name,
+          type: a.type,
+          ttl: a.TTL,
+          data: a.data,
+        })),
+        authenticated: Boolean(body.AD),
+        provider: provider.name,
+      };
+    }
+    return lastError;
+  }
+}
+
+const TYPE_NAMES_REVERSE: Record<RecordType, number> = {
+  A: 1,
+  NS: 2,
+  CNAME: 5,
+  SOA: 6,
+  PTR: 12,
+  MX: 15,
+  TXT: 16,
+  AAAA: 28,
+  SRV: 33,
+  DS: 43,
+  DNSKEY: 48,
+  TLSA: 52,
+  CAA: 257,
+  HTTPS: 65,
+};
+
+/** DNS status codes that mean "the name exists but has no record of this type". */
+export const DNS_NOERROR = 0;
+export const DNS_NXDOMAIN = 3;
+
+/** Join the character-strings of a TXT record and strip the surrounding quotes. */
+export function unquoteTxt(data: string): string {
+  return data
+    .split('" "')
+    .map((part) => part.replace(/^"/, "").replace(/"$/, ""))
+    .join("");
+}

@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" width="1200" height="420" role="img" aria-label="Ocellus: a browser-side website audit">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b0e13"/>
+      <stop offset="1" stop-color="#0e141c"/>
+    </linearGradient>
+    <radialGradient id="poolA" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#4fd1c5" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#4fd1c5" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="poolB" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#5aa9e6" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#5aa9e6" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.04" stroke-width="1"/>
+    </pattern>
+    <clipPath id="frame">
+      <rect width="1200" height="420"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#frame)">
+    <rect width="1200" height="420" fill="url(#bg)"/>
+    <rect width="1200" height="420" fill="url(#grid)"/>
+    <ellipse cx="230" cy="40" rx="360" ry="300" fill="url(#poolA)"/>
+    <ellipse cx="1080" cy="400" rx="330" ry="280" fill="url(#poolB)"/>
+
+    <!-- The mark, with a slow pupil drift: the eye looking across a page. -->
+    <g transform="translate(96,104)">
+      <rect width="96" height="96" rx="21" fill="#10151c" stroke="#ffffff" stroke-opacity="0.08"/>
+      <circle cx="48" cy="48" r="29" fill="none" stroke="#4fd1c5" stroke-opacity="0.3" stroke-width="3"/>
+      <circle cx="48" cy="48" r="18.5" fill="none" stroke="#4fd1c5" stroke-width="3"/>
+      <g>
+        <circle cx="48" cy="48" r="7.6" fill="#4fd1c5"/>
+        <animateTransform attributeName="transform" type="translate"
+          values="0 0; 7 -4; 0 0; -7 4; 0 0" dur="7s" repeatCount="indefinite" calcMode="spline"
+          keySplines="0.4 0 0.2 1; 0.4 0 0.2 1; 0.4 0 0.2 1; 0.4 0 0.2 1"/>
+      </g>
+    </g>
+
+    <text x="96" y="268" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="66" font-weight="600" fill="#e8ecf2" letter-spacing="-2">Ocellus</text>
+    <text x="98" y="312" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="23" fill="#94a1b2">A website audit that runs in your browser.</text>
+
+    <!-- A scan resolving, left to right: the four states the report uses. -->
+    <g font-family="JetBrains Mono, SFMono-Regular, Menlo, monospace" font-size="16">
+      <g transform="translate(96,356)" opacity="1">
+        <circle cx="6" cy="-5" r="5" fill="#56c98a"/>
+        <text x="20" y="0" fill="#94a1b2">dns</text>
+      </g>
+      <g transform="translate(186,356)" opacity="1">
+        <circle cx="6" cy="-5" r="5" fill="#56c98a"/>
+        <text x="20" y="0" fill="#94a1b2">tls</text>
+      </g>
+      <g transform="translate(276,356)" opacity="1">
+        <circle cx="6" cy="-5" r="5" fill="#e0a33a"/>
+        <text x="20" y="0" fill="#94a1b2">headers</text>
+      </g>
+      <g transform="translate(396,356)" opacity="1">
+        <circle cx="6" cy="-5" r="5" fill="#ef6a72"/>
+        <text x="20" y="0" fill="#94a1b2">dmarc</text>
+      </g>
+      <g transform="translate(506,356)" opacity="1">
+        <circle cx="6" cy="-5" r="5" fill="#7b8798"/>
+        <text x="20" y="0" fill="#94a1b2">ports</text>
+      </g>
+    </g>
+
+    <!-- Right: a score dial that fills once, then holds. -->
+    <g transform="translate(940,210)">
+      <circle r="86" fill="none" stroke="#ffffff" stroke-opacity="0.07" stroke-width="10"/>
+      <circle r="86" fill="none" stroke="#4fd1c5" stroke-width="10" stroke-linecap="round"
+              stroke-dasharray="540" stroke-dashoffset="108" transform="rotate(-90)">
+        <animate attributeName="stroke-dashoffset" from="540" to="108" dur="2.2s" begin="0.3s" fill="freeze" calcMode="spline" keySplines="0.3 0 0.2 1"/>
+      </circle>
+      <text x="0" y="8" text-anchor="middle" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="54" font-weight="600" fill="#e8ecf2">80</text>
+      <text x="0" y="34" text-anchor="middle" font-family="JetBrains Mono, Menlo, monospace" font-size="13" fill="#94a1b2">grade B</text>
+    </g>
+  </g>
+</svg>

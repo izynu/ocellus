@@ -1,0 +1,630 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/*
+ * Ocellus visual system.
+ *
+ * Liquid Glass is treated as a material, not a mood: it is used for the chrome
+ * that floats over the background (header, dock, floating panels) and never for
+ * the content a person has to read. A report table on frosted glass is harder
+ * to read than the same table on a solid sheet, so content sits on solid.
+ *
+ * Colour comes from one place: `--primary` for the single action per view and
+ * `--signal-*` for status. Status colour is semantic and never decorative.
+ * There is no gradient mesh, no purple, and no colour used to make something
+ * look important.
+ */
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-destructive: var(--destructive);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+}
+
+/* ---------------------------------------------------------------- tokens -- */
+
+:root {
+  color-scheme: dark;
+
+  /* Base canvas: a deep slate, not black, so glass has something to sit on. */
+  --background: #0b0e13;
+  --foreground: #e8ecf2;
+  --muted: #151a22;
+  --muted-foreground: #94a1b2;
+  --border: #232b36;
+  --ring: #4fd1c5;
+
+  /* Content sheets are opaque. This is the reading surface. */
+  --card: #10151c;
+  --card-foreground: #e8ecf2;
+
+  /* Primary action. A single teal, used once per view. */
+  --primary: #4fd1c5;
+  --primary-foreground: #06231f;
+  --destructive: #f2707a;
+
+  /* Status. Semantic only: never used for decoration. */
+  --signal-pass: #56c98a;
+  --signal-warn: #e0a33a;
+  --signal-fail: #ef6a72;
+  --signal-info: #5aa9e6;
+  --signal-idle: #7b8798;
+
+  /* Glass material. Four numbers fully describe a pane. */
+  --glass-fill: rgb(255 255 255 / 0.045);
+  --glass-fill-strong: rgb(255 255 255 / 0.075);
+  --glass-blur: 22px;
+  --glass-sat: 1.35;
+  /* Inset specular edge: light on top, shadow underneath. */
+  --glass-edge: inset 0 1px 0 rgb(255 255 255 / 0.12), inset 0 -1px 0 rgb(0 0 0 / 0.35);
+  --glass-hair: 1px solid rgb(255 255 255 / 0.09);
+  --glass-shadow: 0 18px 44px -18px rgb(0 0 0 / 0.7);
+
+  /* `*-loaded` variables are injected by next/font/local in layout.tsx. */
+  --font-sans: var(--font-sans-loaded), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-mono-loaded), ui-monospace, "SF Mono", Menlo, monospace;
+
+  --page-max: 1140px;
+  --radius: 14px;
+}
+
+/*
+ * Light is a real theme, not an inversion. Glass on white needs a tinted fill
+ * and a darker hairline, otherwise it disappears.
+ */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --background: #f4f6f8;
+  --foreground: #101720;
+  --muted: #e9edf1;
+  --muted-foreground: #55606e;
+  --border: #d5dbe3;
+  --ring: #0f766e;
+  --card: #ffffff;
+  --card-foreground: #101720;
+  --primary: #0f766e;
+  --primary-foreground: #ffffff;
+  --destructive: #c02b3a;
+  --signal-pass: #14794a;
+  --signal-warn: #92610a;
+  --signal-fail: #b32630;
+  --signal-info: #1b5f9e;
+  --signal-idle: #6b7686;
+  --glass-fill: rgb(255 255 255 / 0.62);
+  --glass-fill-strong: rgb(255 255 255 / 0.82);
+  --glass-edge: inset 0 1px 0 rgb(255 255 255 / 0.9), inset 0 -1px 0 rgb(0 0 0 / 0.06);
+  --glass-hair: 1px solid rgb(16 23 32 / 0.09);
+  --glass-shadow: 0 18px 40px -22px rgb(16 23 32 / 0.28);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass-fill: var(--card);
+    --glass-fill-strong: var(--card);
+    --glass-blur: 0px;
+  }
+}
+
+/* ------------------------------------------------------------------ base -- */
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 16.5px;
+  line-height: 1.62;
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  text-wrap: balance;
+  letter-spacing: -0.018em;
+  line-height: 1.18;
+  font-weight: 620;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--primary) 32%, transparent);
+  color: var(--foreground);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+code,
+kbd,
+pre,
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  font-variant-ligatures: none;
+}
+
+/* ------------------------------------------------------------- structure -- */
+
+/*
+ * The background scene. Two soft light pools and a fine grid, both very low
+ * contrast. It exists so glass has a surface to refract; it is not a hero
+ * decoration and carries no meaning.
+ */
+.scene {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.scene::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.035) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 20%, transparent 78%);
+}
+
+:root[data-theme="light"] .scene::before {
+  background-image:
+    linear-gradient(to right, rgb(16 23 32 / 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(16 23 32 / 0.05) 1px, transparent 1px);
+}
+
+.scene__pool {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.5;
+}
+
+.scene__pool--a {
+  width: 46vw;
+  height: 46vw;
+  top: -14vw;
+  left: -6vw;
+  background: radial-gradient(circle, rgb(79 209 197 / 0.22), transparent 66%);
+}
+
+.scene__pool--b {
+  width: 40vw;
+  height: 40vw;
+  top: 8vw;
+  right: -10vw;
+  background: radial-gradient(circle, rgb(90 169 230 / 0.16), transparent 68%);
+}
+
+.container-page {
+  width: 100%;
+  max-width: var(--page-max);
+  margin-inline: auto;
+  padding-inline: 20px;
+}
+
+@media (min-width: 768px) {
+  .container-page {
+    padding-inline: 32px;
+  }
+}
+
+/* ----------------------------------------------------------------- glass -- */
+
+.glass {
+  background: var(--glass-fill);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  border: var(--glass-hair);
+  box-shadow: var(--glass-edge), var(--glass-shadow);
+  border-radius: var(--radius);
+}
+
+.glass--strong {
+  background: var(--glass-fill-strong);
+}
+
+.glass--flat {
+  box-shadow: var(--glass-edge);
+}
+
+/* The reading surface. Opaque on purpose. */
+.sheet {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.sheet--raised {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 14px 30px -24px rgb(0 0 0 / 0.9);
+}
+
+.hairline {
+  height: 1px;
+  background: var(--border);
+  border: 0;
+}
+
+.eyebrow {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+/* --------------------------------------------------------------- buttons -- */
+
+/*
+ * Rectangular with a 12px radius. Never a pill: a pill reads as a marketing
+ * CTA and this product is a tool.
+ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 42px;
+  padding-inline: 18px;
+  border-radius: 12px;
+  font-size: 14.5px;
+  font-weight: 560;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease;
+  border: 1px solid transparent;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-color: color-mix(in oklab, var(--primary) 70%, black);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--primary) 88%, white);
+}
+
+.btn-quiet {
+  background: transparent;
+  color: var(--foreground);
+  border-color: var(--border);
+}
+
+.btn-quiet:hover:not(:disabled) {
+  background: var(--muted);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--muted-foreground);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  color: var(--foreground);
+  background: var(--muted);
+}
+
+.btn-sm {
+  height: 34px;
+  padding-inline: 12px;
+  font-size: 13px;
+  border-radius: 10px;
+}
+
+/* ----------------------------------------------------------------- field -- */
+
+.field {
+  width: 100%;
+  height: 46px;
+  padding-inline: 14px;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--foreground);
+  font-size: 15px;
+  font-family: var(--font-mono);
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.field::placeholder {
+  color: var(--muted-foreground);
+  font-family: var(--font-sans);
+}
+
+.field:focus {
+  outline: none;
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 22%, transparent);
+}
+
+/* ---------------------------------------------------------------- status -- */
+
+.tone-pass { color: var(--signal-pass); }
+.tone-warn { color: var(--signal-warn); }
+.tone-fail { color: var(--signal-fail); }
+.tone-info { color: var(--signal-info); }
+.tone-idle { color: var(--signal-idle); }
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+  background: currentColor;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding-inline: 9px;
+  border-radius: 7px;
+  font-size: 11.5px;
+  font-weight: 580;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--border);
+  background: var(--muted);
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+
+/*
+ * A source name can be a long sentence ("crt.sh Certificate Transparency index
+ * and the page's own links"). As a single line it is wider than a 360px
+ * viewport and pushed the whole page sideways, so this variant is allowed to
+ * wrap and grow. It is the only chip that carries prose rather than a label.
+ */
+.chip--wrap {
+  height: auto;
+  min-height: 24px;
+  padding-block: 3px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+/* ----------------------------------------------------------------- prose -- */
+
+.prose {
+  max-width: 68ch;
+}
+
+.prose h2 {
+  font-size: 22px;
+  margin-top: 2.2em;
+  margin-bottom: 0.6em;
+}
+
+.prose h3 {
+  font-size: 17px;
+  margin-top: 1.7em;
+  margin-bottom: 0.4em;
+}
+
+.prose p {
+  margin-block: 0.85em;
+  color: color-mix(in oklab, var(--foreground) 88%, var(--muted-foreground));
+}
+
+.prose ul,
+.prose ol {
+  margin-block: 0.85em;
+  padding-left: 1.35em;
+  color: color-mix(in oklab, var(--foreground) 88%, var(--muted-foreground));
+}
+
+.prose li {
+  margin-block: 0.4em;
+}
+
+.prose li::marker {
+  color: var(--muted-foreground);
+}
+
+.prose a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklab, var(--primary) 40%, transparent);
+  text-underline-offset: 3px;
+}
+
+.prose a:hover {
+  text-decoration-color: var(--primary);
+}
+
+.prose strong {
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.prose code {
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 1px 5px;
+  color: var(--foreground);
+}
+
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-block: 1.2em;
+  font-size: 14.5px;
+}
+
+.prose th {
+  text-align: left;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  padding: 8px 12px 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.prose td {
+  padding: 9px 12px 9px 0;
+  border-bottom: 1px solid color-mix(in oklab, var(--border) 55%, transparent);
+  vertical-align: top;
+}
+
+/* --------------------------------------------------------------- motion -- */
+
+/*
+ * One entrance animation, used once per view: a short rise with no bounce.
+ * Anything more competes with the data, which is the thing being read.
+ */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise {
+  animation: rise 420ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.rise-1 { animation-delay: 60ms; }
+.rise-2 { animation-delay: 120ms; }
+.rise-3 { animation-delay: 180ms; }
+.rise-4 { animation-delay: 240ms; }
+
+@keyframes sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(340%); }
+}
+
+/* The indeterminate bar shown while checks are still landing. */
+.sweep::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  width: 30%;
+  background: linear-gradient(90deg, transparent, var(--primary), transparent);
+  opacity: 0.7;
+  animation: sweep 1.5s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 900ms linear infinite;
+}
+
+/* --------------------------------------------------------------- utility -- */
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.truncate-1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.truncate-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  left: 16px;
+  top: -60px;
+  z-index: 100;
+  padding: 10px 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: top 140ms ease;
+}
+
+.skip-link:focus {
+  top: 16px;
+}
