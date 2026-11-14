@@ -27,7 +27,7 @@ export default function TermsPage() {
           Terms of use
         </h1>
         <p className="mt-4" style={{ fontSize: 14, color: "var(--muted-foreground)" }}>
-          Last updated: 14 November 2026
+          Last updated: 15 November 2026
         </p>
       </header>
 
