@@ -225,7 +225,7 @@
     <h1>Uploading Ocellus to cPanel</h1>
     <p class="lede">A static site needs no PHP, no database and no build step on the server. You upload one folder into <code>public_html</code>, confirm the domain points at it, and the site is live.</p>
     <div class="facts">
-      <span>Build output <b>75 files, 2.1 MB</b></span>
+      <span>Build output <b>75 files, 1.9 MB</b></span>
       <span>Server needs <b>Apache with mod_rewrite</b></span>
       <span>Upload time <b>2 to 5 minutes</b></span>
     </div>
@@ -234,7 +234,7 @@
   <section>
     <h2><span class="n">01</span> What you are uploading</h2>
     <p>The build produces a plain directory of files. Everything the browser needs is already in it: HTML, CSS, JavaScript, fonts and icons. Nothing is compiled on the server.</p>
-    <div class="tree"><span class="d">dist/cpanel/</span>              <span class="c">75 files, 2.1 MB</span>
+    <div class="tree"><span class="d">dist/cpanel/</span>              <span class="c">75 files, 1.9 MB</span>
 ├── index.html          <span class="c">the home page</span>
 ├── scan/index.html     <span class="c">the scanner, one directory per route</span>
 ├── checks/index.html
@@ -300,7 +300,8 @@ rsync -avz --delete ./ user@yourdomain.tld:public_html/</pre></div>
         <tr><td><code>mod_expires</code></td><td>Cache lifetime on assets</td><td>Optional. Browsers fall back to their own defaults.</td></tr>
       </tbody>
     </table></div>
-    <p>You can see which modules are loaded under cPanel's <em>Select PHP Version</em> or by asking the host's support. The <code>.htaccess</code> wraps each block in <code>&lt;IfModule&gt;</code>, so a missing module degrades quietly instead of returning a 500 error.</p>
+    <p>You can see which modules are loaded under cPanel's <em>Select PHP Version</em> or by asking the host's support. The <code>.htaccess</code> wraps each block in <code>&lt;IfModule&gt;</code>, so a missing module degrades quietly instead of returning a 500 error. The dotfile block carries both the Apache 2.4 and 2.2 forms for the same reason: <code>Require all denied</code> is a fatal error on a 2.2 server, so the file tests for the module that provides it and falls back.</p>
+    <div class="note"><span class="bar"></span><p>A module test only proves the module is loaded. It says nothing about whether the host grants <code>AllowOverride</code> for a given directive. If the host allows <code>mod_autoindex</code> but denies <code>AllowOverride Indexes</code>, <code>Options -Indexes</code> is still a 500. That is the case the first line of the troubleshooting table below covers.</p></div>
   </section>
 
   <section>

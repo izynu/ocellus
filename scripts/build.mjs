@@ -185,11 +185,32 @@ ErrorDocument 404 /404.html
   ExpiresByType image/svg+xml "access plus 1 year"
 </IfModule>
 
-# No directory listing, and no serving of source maps or dotfiles.
-Options -Indexes
-<FilesMatch "^\\.|(^|/)\\.git">
-  Require all denied
-</FilesMatch>
+# No directory listing, and no serving of dotfiles.
+#
+# Require is Apache 2.4 syntax. On a 2.2 server the directive is a hard 500
+# for the whole site, so it sits behind a test for the module that provides it:
+# 2.2 has no mod_authz_core, so the block is skipped there and the 2.2 dialect
+# below takes over.
+#
+# Note what an IfModule test does not do: it tests whether a module is loaded,
+# not whether the host grants AllowOverride for the directive. A host that
+# allows mod_autoindex but denies AllowOverride Indexes still returns 500 on
+# Options -Indexes. The remedy for that case is renaming .htaccess, which the
+# runbook in docs/cpanel-deploy.html covers.
+<IfModule mod_autoindex.c>
+  Options -Indexes
+</IfModule>
+<IfModule mod_authz_core.c>
+  <FilesMatch "^\\.|(^|/)\\.git">
+    Require all denied
+  </FilesMatch>
+</IfModule>
+<IfModule !mod_authz_core.c>
+  <FilesMatch "^\\.|(^|/)\\.git">
+    Order allow,deny
+    Deny from all
+  </FilesMatch>
+</IfModule>
 `;
 
 const target = process.argv[2] || "all";
