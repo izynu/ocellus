@@ -172,40 +172,49 @@ export async function fetchHeaders(
 /**
  * Parse one or more concatenated HTTP responses, as returned by a proxy that
  * prints the status line and headers verbatim.
+ *
+ * Only the final response's headers are returned. Concatenating every hop into
+ * one map was a real defect: a Set-Cookie from the first hop appeared as though
+ * the final response had set it, and a CSP sent only on the redirect was graded
+ * as the policy protecting the page. Each hop's headers belong to that hop, and
+ * the only hop that describes the page is the last one.
  */
 export function parseRawHttp(raw: string): Omit<HeaderSnapshot, "via"> {
   const lines = raw.replace(/\r/g, "").split("\n");
-  const chain: Array<{ status: number; location?: string }> = [];
-  const headers: Record<string, string[]> = {};
-  let status = 0;
-  let location: string | undefined;
-  let inHeaders = false;
+  const hops: Array<{ status: number; location?: string; headers: Record<string, string[]> }> =
+    [];
+  let current: (typeof hops)[number] | null = null;
 
   for (const line of lines) {
     const statusMatch = /^HTTP\/[\d.]+ (\d{3})/.exec(line);
     if (statusMatch) {
-      // A new status line starts a new hop. Keep the previous hop's location.
-      if (inHeaders && status) chain.push({ status, location });
-      status = Number(statusMatch[1]);
-      location = undefined;
-      inHeaders = true;
+      if (current) hops.push(current);
+      current = { status: Number(statusMatch[1]), headers: {} };
       continue;
     }
-    if (!inHeaders) continue;
+    if (!current) continue;
     if (line.trim() === "") continue;
     const colon = line.indexOf(":");
     if (colon <= 0) continue;
     const name = line.slice(0, colon).trim().toLowerCase();
     const value = line.slice(colon + 1).trim();
-    if (!headers[name]) headers[name] = [];
-    headers[name].push(value);
-    if (name === "location") location = value;
+    if (!current.headers[name]) current.headers[name] = [];
+    current.headers[name].push(value);
+    if (name === "location") current.location = value;
   }
-  if (inHeaders && status) chain.push({ status, location });
+  if (current) hops.push(current);
 
-  const finalUrl = chain.length ? (chain[chain.length - 1].location ?? "") : "";
+  if (hops.length === 0) {
+    return { status: 0, headers: {}, chain: [], finalUrl: "" };
+  }
 
-  return { status, headers, chain, finalUrl };
+  const last = hops[hops.length - 1];
+  return {
+    status: last.status,
+    headers: last.headers,
+    chain: hops.map((h) => ({ status: h.status, location: h.location })),
+    finalUrl: last.location ?? "",
+  };
 }
 
 /** First value for a header, or undefined. Header names are lowercase. */

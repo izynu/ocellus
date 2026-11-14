@@ -48,6 +48,39 @@ export const dnsRecords: CheckDefinition = {
       ctx.dns.query(domain, "CAA"),
     ]);
 
+    // A resolver that never answered leaves every answer array empty, with
+    // status -1 rather than NXDOMAIN. Read as NODATA that produces "no A
+    // record" and "no CAA record" for a zone that may well publish both, so the
+    // check declines to score rather than reporting records it never saw. This
+    // is tested before the NXDOMAIN branch because a failure is not a verdict
+    // about the domain.
+    const resolverFailed = [a, aaaa, mx, ns, txt, soa, caa].some((r) => r.failed);
+    if (resolverFailed) {
+      return {
+        id: this.id,
+        title: this.title,
+        question: this.question,
+        status: "unavailable",
+        headline: "The DNS resolver did not answer, so the zone could not be read.",
+        findings: [],
+        data: {
+          records: [],
+          counts: {},
+          nameservers: [],
+          mailServers: [],
+          addresses: [],
+          soa: null,
+          dnssecValidated: false,
+          provider: "none",
+        } satisfies DnsData,
+        ms: Math.round(performance.now() - started),
+        source: "Google and Cloudflare DNS over HTTPS",
+      };
+    }
+
+    // NXDOMAIN is a verdict the resolver really gave: the name does not exist.
+    // Tested after the failure guard, so a dead resolver can never be reported
+    // as a nonexistent domain.
     if (a.status === DNS_NXDOMAIN) {
       return {
         id: this.id,
@@ -142,11 +175,16 @@ export const dnsRecords: CheckDefinition = {
     if (caa.answers.filter((r) => r.type === 257).length === 0) {
       findings.push({
         id: "dns-no-caa",
-        title: "No CAA record",
-        detail: `${domain} does not restrict which certificate authorities may issue for it. Any CA can issue a certificate that browsers will trust.`,
-        severity: "medium",
+        // Absence of CAA is not a vulnerability: RFC 8659 defines it as a
+        // restriction a domain may choose to publish, and a domain without one
+        // is in the same position as every domain was before 2013. It is a
+        // hardening gap, so it is reported at low severity and phrased as a
+        // recommendation rather than as a defect.
+        title: "No CAA record restricting certificate issuance",
+        detail: `${domain} publishes no CAA record, so any certificate authority may issue a certificate for it. That is the default behaviour, not a misconfiguration, but a CAA record is the only way to narrow it. CAA can also be set on a parent domain and inherited, so check the parent before treating this as missing entirely.`,
+        severity: "low",
         remediation:
-          'Publish a CAA record naming your CA, for example: example.com. CAA 0 issue "letsencrypt.org"',
+          'Publish a CAA record naming your CA, for example: example.com. CAA 0 issue "letsencrypt.org". Add an iodef address to receive reports of refused issuance.',
         reference: {
           label: "RFC 8659",
           url: "https://datatracker.ietf.org/doc/html/rfc8659",

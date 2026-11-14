@@ -236,10 +236,13 @@ export const securityTxt: CheckDefinition = {
     // worst this check reports is a warning. The findings carry the severity.
     const status: CheckResult["status"] = findings.length > 0 ? "warn" : "pass";
 
+    // `fields` is keyed by field name, so its size is the number of distinct
+    // field types, not the number of lines. Saying "fields" for that count
+    // overstated it on any file that repeats Contact.
     const fieldCount = Object.keys(fields).length;
     const headline = expired
       ? `security.txt is present but expired on ${expires}, so RFC 9116 treats it as invalid.`
-      : `security.txt is present with ${fieldCount} field${fieldCount === 1 ? "" : "s"}, ${contacts.length} contact${contacts.length === 1 ? "" : "s"}${expires ? `, valid until ${expires}` : " and no Expires date"}.`;
+      : `security.txt is present with ${fieldCount} field type${fieldCount === 1 ? "" : "s"}, ${contacts.length} contact${contacts.length === 1 ? "" : "s"}${expires ? `, valid until ${expires}` : " and no Expires date"}.`;
 
     return {
       id: this.id,

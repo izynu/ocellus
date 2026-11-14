@@ -7,6 +7,7 @@
  */
 
 import type { CheckDefinition, CheckResult, Finding } from "../types";
+import { isSameSite } from "../target";
 
 export type SeoData = {
   robotsTxt: { found: boolean; status: number; sitemaps: string[]; disallowAll: boolean; groups: number };
@@ -137,17 +138,53 @@ export const seo: CheckDefinition = {
     // --- sitemap ---
     const sitemapText = sitemapRes.ok ? sitemapRes.text : "";
     const sitemapIsXml = /<urlset|<sitemapindex/i.test(sitemapText);
-    const urlCount = (sitemapText.match(/<url>/g) ?? []).length;
-    const isIndex = /<sitemapindex/i.test(sitemapText);
     const sitemapMissing = sitemapStatus === 404 || sitemapStatus === 410;
-    const sitemapFound = sitemapReadable && !sitemapMissing && sitemapIsXml;
-    const sitemapUrl = sitemaps[0] ?? (sitemapFound ? `${origin}/sitemap.xml` : null);
+    const rootSitemapFound = sitemapReadable && !sitemapMissing && sitemapIsXml;
 
-    if (sitemapReadable && !sitemapFound) {
+    // A sitemap declared in robots.txt frequently lives somewhere other than
+    // /sitemap.xml, such as /sitemap_index.xml or a CDN path. The old code read
+    // only the root path and then reported "no sitemap" while the robots file it
+    // had just parsed named one. The declared URL is fetched when it differs.
+    let declaredSitemapFound = false;
+    let declaredSitemapText = "";
+    const declaredUrl = sitemaps[0] ?? null;
+    if (!rootSitemapFound && declaredUrl) {
+      let declaredPath = "";
+      try {
+        const u = new URL(declaredUrl, origin);
+        // The reader needs an absolute URL; a cross-origin sitemap is followed
+        // only when it is on the same site, so a scan cannot be pointed at an
+        // arbitrary third-party document by a robots file.
+        if (u.origin === origin) declaredPath = u.pathname + u.search;
+      } catch {
+        declaredPath = "";
+      }
+      if (declaredPath && declaredPath !== "/sitemap.xml") {
+        const declaredRes = await readBody(declaredPath, `sitemap-declared:${origin}`);
+        if (declaredRes.ok) {
+          declaredSitemapText = declaredRes.text;
+          declaredSitemapFound = /<urlset|<sitemapindex/i.test(declaredSitemapText);
+        }
+      }
+    }
+
+    const sitemapFound = rootSitemapFound || declaredSitemapFound;
+    const effectiveSitemapText = rootSitemapFound ? sitemapText : declaredSitemapText;
+    const urlCount = (effectiveSitemapText.match(/<url>/g) ?? []).length;
+    const isIndex = /<sitemapindex/i.test(effectiveSitemapText);
+    const sitemapUrl = sitemapFound
+      ? rootSitemapFound
+        ? `${origin}/sitemap.xml`
+        : declaredUrl
+      : null;
+
+    if ((sitemapReadable || declaredUrl) && !sitemapFound) {
       findings.push({
         id: "seo-no-sitemap",
-        title: "No sitemap found at /sitemap.xml",
-        detail: "Neither the root sitemap nor a sitemap declared in robots.txt could be read.",
+        title: "No sitemap could be read",
+        detail: declaredUrl
+          ? `robots.txt declares ${declaredUrl}, but neither that file nor ${origin}/sitemap.xml could be read as a sitemap.`
+          : `Neither ${origin}/sitemap.xml nor a sitemap declared in robots.txt could be read.`,
         severity: "low",
         remediation: "Generate a sitemap and reference it from robots.txt.",
         reference: { label: "sitemaps.org", url: "https://www.sitemaps.org/protocol.html" },
@@ -169,7 +206,11 @@ export const seo: CheckDefinition = {
       if (canonical) {
         try {
           const c = new URL(canonical, origin);
-          canonicalMatches = c.host === new URL(ctx.target.url).host;
+          // Same site, not same host: a canonical pointing from the apex to
+          // www (or the reverse) is the normal consolidation pattern, not an
+          // off-site canonical. Only a different registrable domain is the
+          // defect this finding describes.
+          canonicalMatches = isSameSite(c.hostname, ctx.target);
         } catch {
           canonicalMatches = false;
         }

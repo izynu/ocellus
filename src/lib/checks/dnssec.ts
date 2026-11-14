@@ -84,7 +84,7 @@ export const dnssec: CheckDefinition = {
 
     // A failed lookup cannot be told apart from an absent record, and the two
     // verdicts are opposites, so refuse to guess when either query failed.
-    if (dsRes.status === -1 || keyRes.status === -1) {
+    if (dsRes.failed || keyRes.failed) {
       return {
         id: this.id,
         title: this.title,

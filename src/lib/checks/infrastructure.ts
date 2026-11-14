@@ -34,6 +34,8 @@ export type ExposureData = {
     tags: string[];
     vulns: string[];
     available: boolean;
+    /** Distinguishes "never scanned" (404) from "could not ask" (error). */
+    reason: "not-scanned" | "unreachable" | null;
   };
   /** Providers identified from the ASN organisation or CPE list. */
   hostingProvider: string | null;
@@ -106,6 +108,20 @@ export const infrastructure: CheckDefinition = {
       reverse: null,
     };
 
+    if (aRes.failed) {
+      return {
+        id: this.id,
+        title: this.title,
+        question: this.question,
+        status: "unavailable",
+        headline: "The DNS resolver did not answer, so the address could not be read.",
+        findings: [],
+        ms: Math.round(performance.now() - started),
+        source: "Google and Cloudflare DNS over HTTPS",
+        note: "No answer from either resolver is a failure of the lookup, not an absence of the record.",
+      };
+    }
+
     if (!ip) {
       return {
         id: this.id,
@@ -165,6 +181,13 @@ export const infrastructure: CheckDefinition = {
       tags: [] as string[],
       vulns: [] as string[],
       available: false,
+      /**
+       * Why the port data is missing. Shodan answers 404 for an address it has
+       * never scanned and 429 or 5xx when it is refusing or failing, and the
+       * two mean opposite things: "nothing known" versus "could not ask". The
+       * note on the result reports which one happened.
+       */
+      reason: null as "not-scanned" | "unreachable" | null,
     };
 
     if (idbRes.ok && idbRes.json) {
@@ -175,6 +198,10 @@ export const infrastructure: CheckDefinition = {
       internetdb.tags = d.tags ?? [];
       internetdb.vulns = d.vulns ?? [];
       internetdb.available = true;
+    } else if (idbRes.status === 404) {
+      internetdb.reason = "not-scanned";
+    } else {
+      internetdb.reason = "unreachable";
     }
 
     const haystack = [geo.org ?? "", ...internetdb.cpes, ...internetdb.tags].join(" ");
@@ -245,7 +272,7 @@ export const infrastructure: CheckDefinition = {
       question: this.question,
       status,
       headline: ip
-        ? `${ip}${location ? ` in ${location}` : ""}${geo.asn ? `, announced by ${geo.asn}${geo.org ? ` (${geo.org})` : ""}` : ""}. ${internetdb.available ? `${internetdb.ports.length} port${internetdb.ports.length === 1 ? "" : "s"} observed open.` : "Port data was not available."}`
+        ? `${ip}${location ? ` in ${location}` : ""}${geo.asn ? `, announced by ${geo.asn}${geo.org ? ` (${geo.org})` : ""}` : ""}. ${internetdb.available ? `${internetdb.ports.length} port${internetdb.ports.length === 1 ? "" : "s"} observed open.` : internetdb.reason === "not-scanned" ? "Shodan has no scan of this address." : "Shodan could not be reached for this address."}`
         : "No address to look up.",
       findings,
       data: { geo, internetdb, hostingProvider } satisfies ExposureData,
@@ -253,7 +280,9 @@ export const infrastructure: CheckDefinition = {
       source: "DNS over HTTPS, ipwho.is geolocation, Shodan InternetDB",
       note: internetdb.available
         ? "Port data is Shodan's own scan of the address, which may be minutes to days old. It reflects what an outside observer sees, not what your firewall is configured to do."
-        : "Shodan has no record of this address, which usually means it has not been scanned yet, not that nothing is open.",
+        : internetdb.reason === "not-scanned"
+          ? "Shodan answered 404 for this address, which means its index has never scanned it. That is not evidence that nothing is open."
+          : "The Shodan request failed, so no port data was obtained. This says nothing about what is listening on the address; re-running the scan usually works.",
     };
   },
 };

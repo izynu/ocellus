@@ -9,6 +9,7 @@
  */
 
 import type { CheckDefinition, CheckResult, Finding } from "../types";
+import { isSameSite } from "../target";
 
 export type MarkupData = {
   title: string | null;
@@ -158,7 +159,17 @@ export const markup: CheckDefinition = {
       if (!hasLabel) emptyLinks++;
       const href = a.getAttribute("href") ?? "";
       if (href.startsWith("http://")) insecure++;
-      if (/^https?:\/\//i.test(href) && !href.includes(ctx.target.host)) external++;
+      // `includes` on the raw string counted example.com.evil.tld as internal
+      // because the scanned host appears inside it. The hostname has to be
+      // parsed out and compared on a label boundary.
+      if (/^https?:\/\//i.test(href)) {
+        try {
+          const host = new URL(href).hostname.toLowerCase();
+          if (!isSameSite(host, ctx.target)) external++;
+        } catch {
+          // A relative or malformed href cannot be a cross-site absolute link.
+        }
+      }
     }
     if (emptyLinks > 0) {
       findings.push({
@@ -305,6 +316,12 @@ export const markup: CheckDefinition = {
     const status: CheckResult["status"] =
       serious.length >= 3 ? "fail" : findings.length > 0 ? "warn" : "pass";
 
+    // A fixed plural reads "across 1 images, 1 links and 1 form fields" on a
+    // small page. Each count gets its own agreement.
+    const n = (count: number, one: string, many: string) =>
+      `${count} ${count === 1 ? one : many}`;
+    const scope = `across ${n(imgs.length, "image", "images")}, ${n(links.length, "link", "links")} and ${n(inputs.length, "form field", "form fields")}`;
+
     return {
       id: this.id,
       title: this.title,
@@ -312,8 +329,8 @@ export const markup: CheckDefinition = {
       status,
       headline:
         findings.length === 0
-          ? `No markup or accessibility problems were found across ${imgs.length} images, ${links.length} links and ${inputs.length} form fields.`
-          : `${findings.length} markup issue${findings.length === 1 ? "" : "s"} across ${imgs.length} images, ${links.length} links and ${inputs.length} form fields.`,
+          ? `No markup or accessibility problems were found ${scope}.`
+          : `${findings.length} markup issue${findings.length === 1 ? "" : "s"} ${scope}.`,
       findings,
       data: {
         title,

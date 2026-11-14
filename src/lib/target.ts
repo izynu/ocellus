@@ -86,19 +86,42 @@ export function parseTarget(input: string): Target {
   const path = parsed.pathname === "/" ? "" : parsed.pathname.replace(/\/$/, "");
   const url = `${parsed.protocol}//${host}${parsed.port ? ":" + parsed.port : ""}${path}${parsed.search}`;
 
-  const bare = host.replace(/^www\./, "");
-  const domain = registrableDomain(bare);
+  // The exact host is kept, `www.` included. Stripping it meant a scan of
+  // www.example.com fetched headers and DNS for example.com instead, and those
+  // two hosts can answer differently: a redirect, a certificate, or a whole
+  // separate vhost. The registrable domain is still derived from the full host.
+  const domain = registrableDomain(host);
   const subdomain =
-    bare === domain ? "" : bare.slice(0, Math.max(0, bare.length - domain.length - 1));
+    host === domain ? "" : host.slice(0, Math.max(0, host.length - domain.length - 1));
 
   return {
     input: raw,
     url,
-    host: bare,
+    host,
     domain,
     subdomain,
     scheme: parsed.protocol === "http:" ? "http" : "https",
   };
+}
+
+/**
+ * True when `host` belongs to the scanned site rather than a third party.
+ *
+ * Two different questions get asked in the checks and they have different
+ * answers. "Same origin" is an exact host match. "Same site" also covers the
+ * registrable domain, so www.example.com and cdn.example.com are first-party
+ * for a scan of example.com. Both comparisons have to respect the label
+ * boundary: a bare `endsWith` calls notexample.com first-party.
+ */
+export function isSameSite(host: string, target: Target): boolean {
+  const h = host.toLowerCase();
+  const t = target.domain.toLowerCase();
+  return h === t || h.endsWith("." + t);
+}
+
+/** True when the host is exactly the scanned host. */
+export function isSameHost(host: string, target: Target): boolean {
+  return host.toLowerCase() === target.host.toLowerCase();
 }
 
 /** eTLD+1, best-effort. Returns the input when it is already short enough. */

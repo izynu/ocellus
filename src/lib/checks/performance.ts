@@ -11,6 +11,7 @@
 
 import type { CheckDefinition, CheckResult, Finding } from "../types";
 import { header } from "../net/document";
+import { isSameSite } from "../target";
 
 export type PerformanceData = {
   /** Characters in the HTML the reader returned. Not the compressed wire size. */
@@ -64,11 +65,10 @@ export const performance: CheckDefinition = {
     const stylesheets = Array.from(doc.querySelectorAll('link[rel~="stylesheet" i][href]'));
     const images = Array.from(doc.querySelectorAll("img"));
 
-    const selfHost = ctx.target.host.toLowerCase();
     const isThirdParty = (url: string): boolean => {
       try {
         const host = new URL(url, ctx.target.url).hostname.toLowerCase();
-        return host !== selfHost && !host.endsWith("." + selfHost);
+        return !isSameSite(host, ctx.target);
       } catch {
         return false;
       }
@@ -283,7 +283,7 @@ export const performance: CheckDefinition = {
     const headline =
       actionable.length === 0
         ? `${documentBytes} characters of HTML, ${totalBlocking} render-blocking resource${totalBlocking === 1 ? "" : "s"}, ${images.length} image${images.length === 1 ? "" : "s"} and ${domNodes} DOM nodes, with nothing above the reporting threshold.`
-        : `${actionable.length} performance issue${actionable.length === 1 ? "" : "s"} across ${totalBlocking} render-blocking resources, ${images.length} images and ${domNodes} DOM nodes.`;
+        : `${actionable.length} performance issue${actionable.length === 1 ? "" : "s"} across ${totalBlocking} render-blocking resource${totalBlocking === 1 ? "" : "s"}, ${images.length} image${images.length === 1 ? "" : "s"} and ${domNodes} DOM node${domNodes === 1 ? "" : "s"}.`;
 
     const notes = [
       "Timings such as Largest Contentful Paint and Total Blocking Time need a real browser run and are not measured here.",

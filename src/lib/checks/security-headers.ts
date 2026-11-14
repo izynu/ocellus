@@ -40,34 +40,96 @@ type Rule = {
   header: string;
   weight: number;
   severity: Severity;
-  /** Judge a present value. Returns score 0-100 and a note. */
-  judge: (value: string) => { score: number; verdict: HeaderRuleResult["verdict"]; note: string };
+  /**
+   * Judge a present value. Returns score 0-100 and a note. The snapshot is
+   * passed because some headers interact: frame-ancestors in the CSP overrides
+   * X-Frame-Options, so one cannot be graded without seeing the other.
+   */
+  judge: (
+    value: string,
+    ctx: { snapshot: HeaderSnapshot }
+  ) => { score: number; verdict: HeaderRuleResult["verdict"]; note: string };
   missing: { note: string; remediation: string; reference?: { label: string; url: string } };
 };
 
-const CSP_UNSAFE = ["'unsafe-inline'", "'unsafe-eval'", "*", "data:", "http:"];
+/**
+ * Parse a CSP into directive name -> source list.
+ *
+ * Splitting on `;` and then on whitespace is the whole grammar. Repeated
+ * directives are ignored after the first, which matches the spec: a browser
+ * also ignores every repeat.
+ */
+function parseCsp(value: string): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  for (const part of value.split(";")) {
+    const tokens = part.trim().split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) continue;
+    const name = tokens[0].toLowerCase();
+    if (!out.has(name)) out.set(name, tokens.slice(1).map((t) => t.toLowerCase()));
+  }
+  return out;
+}
+
+/** A bare scheme (`https:`) or `*` allows any host. Host sources do not. */
+function isWildcardSource(source: string): boolean {
+  return source === "*" || /^[a-z][a-z0-9+.-]*:$/.test(source);
+}
 
 function judgeCsp(value: string): ReturnType<Rule["judge"]> {
-  const lower = value.toLowerCase();
-  const reportOnly = false; // caller handles the report-only variant
+  const directives = parseCsp(value);
   const problems: string[] = [];
 
-  if (lower.includes("default-src 'none'") || lower.includes("default-src 'self'")) {
-    // A restrictive default is the single biggest win.
-  } else if (lower.includes("default-src")) {
-    problems.push("default-src is broader than 'self'");
-  } else {
-    problems.push("no default-src directive");
+  const defaultSources = directives.get("default-src");
+  const scriptSources =
+    directives.get("script-src-elem") ??
+    directives.get("script-src") ??
+    directives.get("default-src");
+
+  // Which list actually governs script execution. Reading the raw string with
+  // `includes` was the bug here: "default-src 'self' https://evil.example"
+  // contains "default-src 'self'" as a substring and scored 90 while allowing
+  // script from any origin the attacker names.
+  if (!scriptSources) {
+    problems.push("no default-src or script-src directive, so script loading is unrestricted");
   }
 
-  if (lower.includes("'unsafe-inline'")) problems.push("'unsafe-inline' allows injected scripts");
-  if (lower.includes("'unsafe-eval'")) problems.push("'unsafe-eval' allows string-to-code execution");
-  if (/\bscript-src[^;]*\*/.test(lower) || /\bdefault-src[^;]*\*/.test(lower))
-    problems.push("a wildcard source allows any origin");
-  if (lower.includes("http://")) problems.push("an http: source allows plaintext script loading");
+  if (defaultSources) {
+    const loose = defaultSources.filter((s) => isWildcardSource(s) && s !== "'none'");
+    if (loose.length > 0) {
+      problems.push(`default-src allows any origin (${loose.join(" ")})`);
+    }
+  }
+
+  if (scriptSources) {
+    const hasNonceOrHash = scriptSources.some(
+      (s) => s.startsWith("'nonce-") || /^'sha(256|384|512)-/.test(s)
+    );
+    if (scriptSources.includes("*")) {
+      problems.push("script-src allows any origin (*)");
+    }
+    const schemes = scriptSources.filter((s) => isWildcardSource(s) && s !== "*" && s !== "data:");
+    if (schemes.length > 0) {
+      problems.push(`script-src allows any host over ${schemes.join(", ")}`);
+    }
+    if (scriptSources.includes("data:")) {
+      problems.push("script-src allows data: URLs, which can carry an inline script");
+    }
+    if (scriptSources.includes("'unsafe-inline'") && !hasNonceOrHash) {
+      problems.push("'unsafe-inline' lets injected inline scripts run");
+    }
+    if (scriptSources.includes("'unsafe-eval'")) {
+      problems.push("'unsafe-eval' turns strings into code");
+    }
+  }
+
+  const unrestricted =
+    !scriptSources ||
+    (scriptSources ?? []).some((s) => isWildcardSource(s) || s === "data:");
 
   if (problems.length === 0) {
-    const strict = lower.includes("'strict-dynamic'") || lower.includes("'nonce-") || lower.includes("'sha256-");
+    const strict = (scriptSources ?? []).some(
+      (s) => s === "'strict-dynamic'" || s.startsWith("'nonce-") || /^'sha(256|384|512)-/.test(s)
+    );
     return {
       score: strict ? 100 : 90,
       verdict: "good",
@@ -76,9 +138,10 @@ function judgeCsp(value: string): ReturnType<Rule["judge"]> {
         : "Restrictive policy. Adding a nonce or hash would make it strict.",
     };
   }
+
   return {
     score: problems.length >= 3 ? 25 : problems.length === 2 ? 45 : 65,
-    verdict: problems.length >= 2 ? "weak" : "weak",
+    verdict: unrestricted || problems.length >= 2 ? "misconfigured" : "weak",
     note: problems.join("; ") + ".",
   };
 }
@@ -104,18 +167,35 @@ const RULES: Rule[] = [
     weight: 20,
     severity: "high",
     judge: (value) => {
-      const maxAge = /max-age\s*=\s*(\d+)/i.exec(value);
-      const age = maxAge ? Number(maxAge[1]) : 0;
-      const hasSub = /includeSubDomains/i.test(value);
-      const preload = /preload/i.test(value);
+      const maxAge = /max-age\s*=\s*"?(\d+)"?/i.exec(value);
+      const hasSub = /includesubdomains/i.test(value);
+      const preload = /(?:^|;)\s*preload\s*(?:;|$)/i.test(value);
+      // No max-age at all is not the same as max-age=0. RFC 6797 §6.1 makes a
+      // missing directive invalid, so the browser ignores the whole header and
+      // the site has no HSTS protection at all. Saying "max-age is zero" for
+      // that case described a configuration the site did not send.
+      if (!maxAge) {
+        return {
+          score: 10,
+          verdict: "misconfigured",
+          note: "The header carries no max-age directive, so browsers ignore it entirely and HSTS is not enabled.",
+        };
+      }
+      const age = Number(maxAge[1]);
       if (age === 0)
-        return { score: 20, verdict: "misconfigured", note: "max-age is zero, which disables HSTS." };
-      if (age < 15_552_000)
+        return {
+          score: 20,
+          verdict: "misconfigured",
+          note: "max-age is zero, which tells the browser to forget the policy immediately.",
+        };
+      if (age < 15_552_000) {
+        const days = age / 86_400;
         return {
           score: 60,
           verdict: "weak",
-          note: `max-age is ${Math.round(age / 86_400)} days. The recommended minimum is 180 days.`,
+          note: `max-age is ${days < 1 ? "under a day" : `${Math.round(days)} days`}. The recommended minimum is 180 days.`,
         };
+      }
       const extras = [hasSub && "includeSubDomains", preload && "preload"].filter(Boolean);
       return {
         score: hasSub && preload ? 100 : hasSub ? 90 : 80,
@@ -154,17 +234,31 @@ const RULES: Rule[] = [
     header: "x-frame-options",
     weight: 10,
     severity: "medium",
-    judge: (value) => {
-      const v = value.toLowerCase();
-      if (v.includes("deny")) return { score: 100, verdict: "good", note: "Framing is denied entirely." };
-      if (v.includes("sameorigin"))
+    judge: (value, { snapshot }) => {
+      const v = value.toLowerCase().trim();
+      if (v === "deny") return { score: 100, verdict: "good", note: "Framing is denied entirely." };
+      if (v === "sameorigin")
         return { score: 90, verdict: "good", note: "Framing is limited to the same origin." };
-      if (v.includes("allow-from"))
+      if (v.startsWith("allow-from"))
         return {
           score: 30,
           verdict: "weak",
           note: "ALLOW-FROM is obsolete and ignored by current browsers.",
         };
+      // CSP frame-ancestors overrides X-Frame-Options wherever both are sent, so
+      // a site that sends a bad XFO but a good frame-ancestors is protected and
+      // grading the obsolete header alone would be wrong.
+      const csp = headerAll(snapshot, "content-security-policy").join("; ");
+      const ancestors = parseCsp(csp).get("frame-ancestors");
+      if (ancestors) {
+        const restrictive =
+          ancestors.length === 1 && (ancestors[0] === "'none'" || ancestors[0] === "'self'");
+        return {
+          score: restrictive ? 90 : 60,
+          verdict: restrictive ? "good" : "weak",
+          note: `X-Frame-Options is "${value}", but the CSP frame-ancestors directive (${ancestors.join(" ")}) takes precedence in current browsers.`,
+        };
+      }
       return { score: 20, verdict: "misconfigured", note: `Unrecognised value "${value}".` };
     },
     missing: {
@@ -182,16 +276,51 @@ const RULES: Rule[] = [
     weight: 8,
     severity: "low",
     judge: (value) => {
-      const v = value.toLowerCase().trim();
-      const safe = ["no-referrer", "same-origin", "strict-origin", "strict-origin-when-cross-origin", "origin"];
-      if (v === "unsafe-url" || v === "no-referrer-when-downgrade")
+      // Referrer-Policy is a comma-separated fallback list and the browser uses
+      // the last value it recognises. Judging the whole string marked a header
+      // like "origin-when-cross-origin, strict-origin-when-cross-origin" as
+      // unrecognised even though the effective policy is the strict one.
+      const tokens = value
+        .split(",")
+        .map((t) => t.trim().toLowerCase())
+        .filter(Boolean);
+      const known = tokens.filter((t) =>
+        [
+          "no-referrer",
+          "no-referrer-when-downgrade",
+          "same-origin",
+          "origin",
+          "strict-origin",
+          "origin-when-cross-origin",
+          "strict-origin-when-cross-origin",
+          "unsafe-url",
+        ].includes(t)
+      );
+      const effective = known[known.length - 1];
+      if (!effective) {
+        return { score: 50, verdict: "weak", note: `"${value}" contains no policy a browser recognises.` };
+      }
+      const safe = [
+        "no-referrer",
+        "same-origin",
+        "strict-origin",
+        "strict-origin-when-cross-origin",
+        "origin",
+        "origin-when-cross-origin",
+      ];
+      if (effective === "unsafe-url" || effective === "no-referrer-when-downgrade")
         return {
           score: 20,
           verdict: "weak",
-          note: `"${value}" leaks the full URL to other origins.`,
+          note: `The effective policy is "${effective}", which leaks the full URL to other origins.`,
         };
-      if (safe.includes(v)) return { score: 100, verdict: "good", note: `"${value}" limits cross-origin referrer detail.` };
-      return { score: 50, verdict: "weak", note: `"${value}" is a partial or unrecognised policy.` };
+      if (safe.includes(effective))
+        return {
+          score: 100,
+          verdict: "good",
+          note: `The effective policy is "${effective}", which limits cross-origin referrer detail.`,
+        };
+      return { score: 50, verdict: "weak", note: `"${effective}" is a partial policy.` };
     },
     missing: {
       note: "Without a policy, the browser default sends the full URL to other origins, including any tokens in the path or query.",
@@ -207,14 +336,39 @@ const RULES: Rule[] = [
     header: "permissions-policy",
     weight: 6,
     severity: "low",
-    judge: (value) =>
-      value.trim().length > 0
-        ? {
-            score: 100,
-            verdict: "good",
-            note: `${value.split(",").length} features are explicitly scoped.`,
-          }
-        : { score: 0, verdict: "misconfigured", note: "Header is present but empty." },
+    judge: (value) => {
+      const v = value.trim();
+      if (v.length === 0)
+        return { score: 0, verdict: "misconfigured", note: "Header is present but empty." };
+      // "geolocation=*" is a header that exists and grants the feature to every
+      // origin, which is strictly worse than the default of same-origin. The
+      // old rule scored any non-empty value 100.
+      const grants = v
+        .split(",")
+        .map((part) => part.trim())
+        .filter(Boolean);
+      const open = grants.filter((g) => /=\s*\*/.test(g));
+      const disabled = grants.filter((g) => /=\s*\(\s*\)/.test(g));
+      if (open.length > 0) {
+        return {
+          score: 25,
+          verdict: "misconfigured",
+          note: `${open.length} directive${open.length === 1 ? " grants" : "s grant"} the feature to every origin (${open.map((g) => g.split("=")[0].trim()).join(", ")}).`,
+        };
+      }
+      if (disabled.length === 0) {
+        return {
+          score: 55,
+          verdict: "weak",
+          note: `${grants.length} feature${grants.length === 1 ? " is" : "s are"} named but none is explicitly disabled with =().`,
+        };
+      }
+      return {
+        score: 100,
+        verdict: "good",
+        note: `${disabled.length} of ${grants.length} named feature${grants.length === 1 ? " is" : "s are"} explicitly disabled.`,
+      };
+    },
     missing: {
       note: "Camera, microphone, geolocation and payment APIs are available to any embedded frame that asks.",
       remediation:
@@ -230,11 +384,20 @@ const RULES: Rule[] = [
     weight: 6,
     severity: "low",
     judge: (value) => {
-      const v = value.toLowerCase();
-      if (v.includes("same-origin"))
+      const v = value.toLowerCase().trim();
+      // `unsafe-none` is the default state written out. It provides no isolation
+      // at all, and matching it with `includes("same-origin")` would grade it as
+      // though it did.
+      if (v === "same-origin")
         return { score: 100, verdict: "good", note: "Opener relationships are isolated to the same origin." };
-      if (v.includes("same-origin-allow-popups"))
+      if (v === "same-origin-allow-popups")
         return { score: 85, verdict: "good", note: "Isolated, with popups allowed to keep an opener." };
+      if (v === "unsafe-none")
+        return {
+          score: 20,
+          verdict: "misconfigured",
+          note: '"unsafe-none" is the browser default written out, and provides no isolation.',
+        };
       return { score: 40, verdict: "weak", note: `"${value}" provides no isolation.` };
     },
     missing: {
@@ -251,10 +414,19 @@ const RULES: Rule[] = [
     weight: 4,
     severity: "low",
     judge: (value) => {
-      const v = value.toLowerCase();
-      if (v.includes("same-origin") || v.includes("same-site"))
-        return { score: 100, verdict: "good", note: `"${value}" blocks cross-origin embedding.` };
-      if (v.includes("cross-origin"))
+      const v = value.toLowerCase().trim();
+      // `same-site` and `same-origin` are not the same guarantee: same-site still
+      // allows every sibling subdomain to embed the resource. The old rule
+      // matched both with one `includes` and scored them identically.
+      if (v === "same-origin")
+        return { score: 100, verdict: "good", note: '"same-origin" blocks every cross-origin embed.' };
+      if (v === "same-site")
+        return {
+          score: 75,
+          verdict: "weak",
+          note: '"same-site" still lets sibling subdomains embed the resource. "same-origin" is the stronger value.',
+        };
+      if (v === "cross-origin")
         return { score: 60, verdict: "weak", note: "Any origin may embed these resources." };
       return { score: 40, verdict: "weak", note: `Unrecognised value "${value}".` };
     },
@@ -367,6 +539,40 @@ export const securityHeaders: CheckDefinition = {
       }
 
       if (values.length === 0) {
+        // X-Frame-Options is the legacy half of clickjacking protection. A site
+        // that sends only the CSP frame-ancestors directive is protected in every
+        // current browser, so reporting a missing XFO as a defect would be a
+        // false finding. The directive is graded here instead.
+        if (rule.header === "x-frame-options") {
+          const cspValue = headerAll(snapshot, "content-security-policy").join("; ");
+          const ancestors = parseCsp(cspValue).get("frame-ancestors");
+          if (ancestors && ancestors.length > 0) {
+            const restrictive =
+              ancestors.length === 1 && (ancestors[0] === "'none'" || ancestors[0] === "'self'");
+            rules.push({
+              header: rule.header,
+              present: false,
+              value: null,
+              score: restrictive ? 90 : 60,
+              weight: rule.weight,
+              verdict: restrictive ? "good" : "weak",
+              note: `Not set, but the CSP frame-ancestors directive (${ancestors.join(" ")}) covers this in current browsers.`,
+            });
+            if (!restrictive) {
+              findings.push({
+                id: `header-${rule.header}-weak`,
+                title: "Framing is restricted by CSP, but loosely",
+                detail: `X-Frame-Options is not set and the CSP frame-ancestors directive allows ${ancestors.join(" ")}.`,
+                severity: "low",
+                remediation:
+                  "Narrow frame-ancestors to 'none' or 'self' unless a named origin genuinely needs to frame the page.",
+                reference: rule.missing.reference,
+              });
+            }
+            continue;
+          }
+        }
+
         rules.push({
           header: rule.header,
           present: false,
@@ -389,7 +595,7 @@ export const securityHeaders: CheckDefinition = {
 
       // Multiple values for one header is itself a bug for most of these.
       const value = values.join(", ");
-      const judged = rule.judge(value);
+      const judged = rule.judge(value, { snapshot });
       rules.push({
         header: rule.header,
         present: true,

@@ -12,7 +12,12 @@ export type Target = {
   input: string;
   /** Absolute URL with scheme and host, no trailing slash on the path root. */
   url: string;
-  /** Hostname only, no `www.` prefix. */
+  /**
+   * The exact hostname from the URL, lowercased, with any trailing dot removed.
+   * `www.` is kept: a scan of www.example.com must request headers and DNS for
+   * www.example.com, because a host can serve a different response than its
+   * apex. Comparisons that mean "same site" use `domain`, not this.
+   */
   host: string;
   /** Registrable domain, best-effort (eTLD+1). Used for DNS and WHOIS checks. */
   domain: string;

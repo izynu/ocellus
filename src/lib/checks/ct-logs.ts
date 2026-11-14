@@ -92,7 +92,21 @@ export const ctLogs: CheckDefinition = {
     try {
       entries = JSON.parse(res.text) as CtEntry[];
     } catch {
-      entries = [];
+      // crt.sh answers an unparseable body under load, and sometimes an HTML
+      // error page with a 200. Reporting that as "no certificates exist" would
+      // state a fact about the domain from a response that said nothing about
+      // it, so the check declines to answer instead.
+      return {
+        id: this.id,
+        title: this.title,
+        question: this.question,
+        status: "unavailable",
+        headline: "The CT log index returned a response that could not be read as JSON.",
+        findings: [],
+        ms: Math.round(performance.now() - started),
+        source: "crt.sh",
+        note: "crt.sh is occasionally slow under load and answers with an error page. This is not evidence that no certificates exist for the domain.",
+      };
     }
 
     if (!Array.isArray(entries) || entries.length === 0) {
@@ -113,8 +127,15 @@ export const ctLogs: CheckDefinition = {
     let newest: string | null = null;
     let oldest: string | null = null;
     let longest = 0;
-    /** The single longest-lived certificate, so the finding can cite its dates. */
-    let longestEntry: CtEntry | null = null;
+    /**
+     * The longest-lived certificate issued on or after the 398-day cap took
+     * effect, with its dates. Tracking only the global maximum missed the real
+     * defect: a 2015 ten-year certificate outranked a 500-day certificate from
+     * last year, so the one that actually violates the cap was never cited.
+     */
+    const CUTOFF = Date.UTC(2020, 8, 1);
+    let longestSinceCutoff = 0;
+    let longestSinceCutoffEntry: CtEntry | null = null;
 
     for (const e of entries) {
       const label = caLabel(e.issuer_name);
@@ -134,7 +155,11 @@ export const ctLogs: CheckDefinition = {
       const v = validityDays(e.not_before, e.not_after);
       if (v > longest) {
         longest = v;
-        longestEntry = e;
+      }
+      const issued = e.not_before ? Date.parse(e.not_before) : NaN;
+      if (v > longestSinceCutoff && !Number.isNaN(issued) && issued >= CUTOFF) {
+        longestSinceCutoff = v;
+        longestSinceCutoffEntry = e;
       }
     }
 
@@ -146,22 +171,16 @@ export const ctLogs: CheckDefinition = {
 
     const findings: Finding[] = [];
 
-    // The 398-day cap only applies to certificates issued after 1 September
-    // 2020. A 10-year certificate from 2015 is history, not a current defect,
-    // so the rule is applied to the issue date rather than to the maximum
-    // validity in the whole log.
-    const CUTOFF = Date.UTC(2020, 8, 1);
-    const issuedAt = longestEntry?.not_before ? Date.parse(longestEntry.not_before) : NaN;
-    const violatesCap =
-      longest > 398 && !Number.isNaN(issuedAt) && issuedAt >= CUTOFF;
-
-    if (violatesCap && longestEntry) {
-      const issued = longestEntry.not_before?.slice(0, 10) ?? "an unknown date";
-      const expires = longestEntry.not_after?.slice(0, 10) ?? "an unknown date";
+    // The 398-day cap only applies to certificates issued on or after
+    // 1 September 2020. A 10-year certificate from 2015 is history, not a
+    // current defect, so the rule is judged against the issue date.
+    if (longestSinceCutoff > 398 && longestSinceCutoffEntry) {
+      const issued = longestSinceCutoffEntry.not_before?.slice(0, 10) ?? "an unknown date";
+      const expires = longestSinceCutoffEntry.not_after?.slice(0, 10) ?? "an unknown date";
       findings.push({
         id: "ct-long-validity",
         title: "A certificate was issued with a validity longer than 398 days",
-        detail: `The longest validity issued after the cap took effect runs ${longest} days, from ${issued} to ${expires}. Certificates issued after 1 September 2020 are limited to 398 days by the CA/Browser Forum baseline requirements.`,
+        detail: `The longest validity issued after the cap took effect runs ${longestSinceCutoff} days, from ${issued} to ${expires}. Certificates issued after 1 September 2020 are limited to 398 days by the CA/Browser Forum baseline requirements.`,
         severity: "medium",
         remediation:
           "Reissue with a current CA. Long-lived certificates cannot be revoked at the speed a compromise demands.",

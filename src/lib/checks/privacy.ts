@@ -10,6 +10,7 @@
 
 import type { CheckDefinition, CheckResult, Finding } from "../types";
 import { headerAll } from "../net/document";
+import { isSameSite } from "../target";
 
 export type Cookie = {
   name: string;
@@ -102,6 +103,21 @@ const TRACKERS: Array<{ domain: string; vendor: string; category: TrackerHit["ca
   { domain: "cdnjs.cloudflare.com", vendor: "cdnjs", category: "other" },
 ];
 
+/**
+ * Split one Set-Cookie header line into its cookies.
+ *
+ * The header source joins repeated Set-Cookie lines with ", ", and a single
+ * line can legitimately carry several cookies. Splitting on every comma breaks
+ * on the date in `expires=Sun, 14 Nov 2027 ...`, so a comma only starts a new
+ * cookie when what follows is `name=` with no space before the equals sign.
+ */
+function splitSetCookieHeader(raw: string): string[] {
+  return raw
+    .split(/,(?=\s*[!#$%&'*+\-.^_`|~0-9A-Za-z]+=)/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 function parseSetCookie(raw: string): Cookie {
   const parts = raw.split(";").map((p) => p.trim());
   const [nameValue, ...attrs] = parts;
@@ -142,7 +158,14 @@ export const privacy: CheckDefinition = {
     const [snapshot, page] = await Promise.all([ctx.headers(), ctx.html()]);
 
     const findings: Finding[] = [];
-    const rawCookies = headerAll(snapshot, "set-cookie");
+    // Without a header snapshot there are no Set-Cookie lines to judge. Reading
+    // that absence as "this site sets no cookies" would be a clean verdict
+    // awarded for a request that never succeeded, so the cookie half of the
+    // check is reported as unmeasured instead.
+    const headersAvailable = snapshot.via !== "unavailable" && snapshot.status !== 0;
+    const rawCookies = headersAvailable
+      ? headerAll(snapshot, "set-cookie").flatMap(splitSetCookieHeader)
+      : [];
     const cookies = rawCookies.map(parseSetCookie);
 
     // --- cookie flags ---
@@ -196,10 +219,17 @@ export const privacy: CheckDefinition = {
       }
     };
 
+    // A bare `endsWith` test calls `notexample.com` first-party on a scan of
+    // `example.com`, because the string really does end with it. The label
+    // boundary is what makes it a suffix of the hostname rather than of the text,
+    // and same-site (not same-host) is the right question for a third-party list:
+    // a static asset on cdn.example.com is still first party.
+    const isFirstParty = (host: string): boolean => isSameSite(host, ctx.target);
+
     const record = (url: string, tag: string) => {
       const host = hostOf(url);
       if (!host) return;
-      const isThirdParty = !host.endsWith(ctx.target.host);
+      const isThirdParty = !isFirstParty(host);
       if (isThirdParty) thirdPartyHosts.add(host);
 
       if (ctx.target.scheme === "https" && url.startsWith("http://")) {
@@ -229,7 +259,7 @@ export const privacy: CheckDefinition = {
         const src = el.getAttribute("src") ?? "";
         record(src, "script");
         const host = hostOf(src);
-        if (host && !host.endsWith(ctx.target.host)) {
+        if (host && !isFirstParty(host)) {
           externalScripts++;
           if (!el.getAttribute("integrity")) missingSri++;
         }
@@ -238,7 +268,7 @@ export const privacy: CheckDefinition = {
         const href = el.getAttribute("href") ?? "";
         record(href, "stylesheet");
         const host = hostOf(href);
-        if (host && !host.endsWith(ctx.target.host) && !el.getAttribute("integrity")) missingSri++;
+        if (host && !isFirstParty(host) && !el.getAttribute("integrity")) missingSri++;
       }
       for (const el of Array.from(doc.querySelectorAll("iframe[src]"))) {
         record(el.getAttribute("src") ?? "", "iframe");
@@ -302,15 +332,25 @@ export const privacy: CheckDefinition = {
 
     const serious = findings.filter((f) => f.severity === "high" || f.severity === "critical");
     const status: CheckResult["status"] =
-      serious.length >= 2 ? "fail" : findings.length > 0 ? "warn" : "pass";
+      serious.length >= 2
+        ? "fail"
+        : findings.length > 0
+          ? "warn"
+          : // A clean verdict needs both halves to have run. With no header
+            // snapshot, only the document was inspected, so the result is
+            // reported as neutral information rather than a pass.
+            headersAvailable
+            ? "pass"
+            : "info";
 
     return {
       id: this.id,
       title: this.title,
       question: this.question,
       status,
-      headline:
-        cookies.length === 0 && trackers.length === 0
+      headline: !headersAvailable
+        ? `Response headers could not be read, so cookies are unmeasured. ${trackers.length} known tracker${trackers.length === 1 ? " is" : "s are"} referenced and ${thirdPartyHosts.size} third-party host${thirdPartyHosts.size === 1 ? " is" : "s are"} present in the document.`
+        : cookies.length === 0 && trackers.length === 0
           ? "No cookies are set on the first response and no known trackers are referenced."
           : `${cookies.length} cookie${cookies.length === 1 ? "" : "s"} on the first response, ${trackers.length} known tracker${trackers.length === 1 ? "" : "s"} referenced, ${thirdPartyHosts.size} third-party host${thirdPartyHosts.size === 1 ? "" : "s"} in total.`,
       findings,
@@ -324,7 +364,9 @@ export const privacy: CheckDefinition = {
       } satisfies PrivacyData,
       ms: Math.round(performance.now() - started),
       source: "Set-Cookie response headers plus document script and frame sources",
-      note: "Tracker detection reads the document's references. Scripts injected at runtime are not visible without executing the page, so this is a lower bound.",
+      note: headersAvailable
+        ? "Tracker detection reads the document's references. Scripts injected at runtime are not visible without executing the page, so this is a lower bound."
+        : "Tracker detection reads the document's references. The header source did not answer, so no cookie could be inspected; only the document half of this check ran.",
     };
   },
 };

@@ -20,13 +20,21 @@ export type DnsAnswer = {
 };
 
 export type DnsResponse = {
-  /** DoH status: 0 = NOERROR, 3 = NXDOMAIN, 2 = SERVFAIL, 5 = REFUSED. */
+  /** DoH status: 0 = NOERROR, 3 = NXDOMAIN, 2 = SERVFAIL, 5 = REFUSED, -1 = no answer obtained. */
   status: number;
   answers: DnsAnswer[];
   authority: DnsAnswer[];
   /** True when the resolver validated DNSSEC for this answer. */
   authenticated: boolean;
   provider: string;
+  /**
+   * True when every provider failed to answer, so the record set is unknown
+   * rather than empty. This distinction is the whole point: an empty `answers`
+   * array from a network failure and an empty array from a real NODATA reply
+   * look identical, and reading the first as the second fabricates findings.
+   * A check that sees `failed` must report unavailable, never "no record".
+   */
+  failed: boolean;
 };
 
 export type RecordType =
@@ -112,6 +120,7 @@ export class DnsResolver {
       authority: [],
       authenticated: false,
       provider: "none",
+      failed: true,
     };
 
     for (const provider of PROVIDERS) {
@@ -143,8 +152,12 @@ export class DnsResolver {
           ttl: a.TTL,
           data: a.data,
         })),
-        authenticated: Boolean(body.AD),
+        // Only trust the AD flag on a NOERROR answer. A refused or failed query
+        // is not validated, and reporting it as authenticated would be a claim
+        // about a response nobody received.
+        authenticated: body.Status === 0 && Boolean(body.AD),
         provider: provider.name,
+        failed: false,
       };
     }
     return lastError;

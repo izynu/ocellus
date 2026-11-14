@@ -128,7 +128,7 @@ const RULES: Record<RuleId, RuleMeta> = {
       "Keep urgency claims only where they are true and can be substantiated, such as a real stock count or a real deadline. A claim that cannot be evidenced is a deceptive practice under the FTC Act.",
     reference: FTC_DARK_PATTERNS,
     detail: (count) =>
-      `${count} urgency or scarcity phrase${count === 1 ? "" : "s"} appear in the visible text. These claims can be legitimate, so the finding is that the pattern is present; the site should be able to substantiate each one.`,
+      `${count} urgency or scarcity phrase${count === 1 ? " appears" : "s appear"} in the visible text. These claims can be legitimate, so the finding is that the pattern is present; the site should be able to substantiate each one.`,
   },
   "forced-consent": {
     title: "Marketing consent required to continue",
