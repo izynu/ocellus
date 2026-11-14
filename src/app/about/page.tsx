@@ -24,7 +24,7 @@ export default function AboutPage() {
       <header className="rise pt-14 pb-2 md:pt-20">
         <p className="eyebrow">About</p>
         <h1 className="mt-4" style={{ fontSize: "clamp(1.9rem, 4.4vw, 2.7rem)", maxWidth: "24ch" }}>
-          A small audit tool that reports what it measured.
+          An audit tool that shows its sources and its gaps.
         </h1>
       </header>
 

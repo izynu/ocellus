@@ -23,7 +23,7 @@ export const SITE = {
   name: "Ocellus",
   /** One line, used as the default meta description and under the wordmark. */
   tagline:
-    "A browser-side audit of what a website exposes, and what it asks of the people using it.",
+    "A browser-side audit of one hostname: DNS, certificates, response headers, email authentication, privacy and accessibility, measured from public sources.",
   /** Origin only, no trailing slash and no base path. */
   origin: ORIGIN,
   /** Canonical site URL: origin plus the base path the build was made for. */

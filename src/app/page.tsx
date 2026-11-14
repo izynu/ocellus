@@ -98,7 +98,7 @@ export default function HomePage() {
           className="mt-4"
           style={{ fontSize: "clamp(2.1rem, 5.4vw, 3.4rem)", maxWidth: "19ch" }}
         >
-          See what a website exposes, in your browser.
+          What a hostname gives away, measured from public sources.
         </h1>
         <p
           className="mt-6"

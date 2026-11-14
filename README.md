@@ -8,7 +8,7 @@
 
 ---
 
-Ocellus reads a website the way a careful visitor would: it asks the domain what it publishes, asks the certificate logs what was issued, asks the server what it admits in its headers, and reads the page to see what it asks of the people using it. Then it shows the answer, the evidence behind the answer, and what it could not determine.
+Ocellus reads a website the way a careful visitor would: it asks the domain what it publishes, asks the certificate logs what was issued, asks the server what it admits in its headers, and reads the page to see how it is built and what it loads. Then it shows the answer, the evidence behind the answer, and what it could not determine.
 
 It runs entirely in your browser. There is no server, no account, no API key, and no database. Every value in a report came from a public source that your browser queried directly.
 
