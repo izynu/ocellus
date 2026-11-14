@@ -53,7 +53,7 @@ export default function ChecksPage() {
         </div>
       </header>
 
-      {GROUP_ORDER.map((group) => {
+      {GROUP_ORDER.map((group, groupIndex) => {
         const members = groupOf(group);
         if (members.length === 0) return null;
         const headingId = `group-${group}`;
@@ -70,84 +70,59 @@ export default function ChecksPage() {
                 {members.length} {members.length === 1 ? "check" : "checks"}
               </p>
             </div>
-            <hr className="hairline mt-3 mb-0" />
 
-            <dl className="m-0">
+            <ul className="box-grid mt-4">
               {members.map((check, index) => (
-                <div
+                <li
                   key={check.id}
-                  className="grid grid-cols-1 gap-1.5 py-5 md:grid-cols-[minmax(0,1fr)_auto] md:gap-6"
-                  style={{
-                    borderTop: index === 0 ? "none" : "1px solid var(--border)",
-                  }}
+                  className="box rise"
+                  style={{ ["--i" as string]: Math.min(index + groupIndex, 8) }}
                 >
-                  <div>
-                    <dt className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                      <span style={{ fontSize: 16, fontWeight: 600 }}>{check.title}</span>
-                      <span className="mono" style={{ color: "var(--muted-foreground)" }}>
-                        {check.id}
-                      </span>
-                    </dt>
-                    <dd
-                      className="m-0 mt-1.5"
-                      style={{
-                        fontSize: 14.5,
-                        lineHeight: 1.55,
-                        maxWidth: "68ch",
-                        color: "var(--muted-foreground)",
-                      }}
-                    >
-                      {check.question}
-                    </dd>
+                  <div className="box__head">
+                    <span className="dot tone-info" aria-hidden="true" />
+                    <h3 className="box__title">{check.title}</h3>
                   </div>
-                  <div className="md:pt-0.5">
-                    <span className="chip tabular" title={`Weight ${check.weight}: ${WEIGHT_MEANING[check.weight]}`}>
+                  <p className="box__body">{check.question}</p>
+                  <div className="box__meta">
+                    <span
+                      className="chip tabular"
+                      title={`Weight ${check.weight}: ${WEIGHT_MEANING[check.weight]}`}
+                    >
                       weight {check.weight}
                     </span>
+                    <span className="mono">{check.id}</span>
                   </div>
-                </div>
+                </li>
               ))}
-            </dl>
+            </ul>
           </section>
         );
       })}
 
       <section className="mt-16 md:mt-20" aria-labelledby="weights">
         <h2 id="weights" style={{ fontSize: 22 }}>
-          Weight in one table
+          Weight in one place
         </h2>
-        <div className="prose mt-4">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Weight</th>
-                <th scope="col">Meaning</th>
-                <th scope="col">Checks</th>
-              </tr>
-            </thead>
-            <tbody>
-              {([3, 2, 1] as const).map((weight) => {
-                const members = checks.filter((c) => c.weight === weight);
-                return (
-                  <tr key={weight}>
-                    <td className="tabular">{weight}</td>
-                    <td>{WEIGHT_MEANING[weight]}</td>
-                    <td className="tabular">{members.length}</td>
-                  </tr>
-                );
-              })}
-              <tr>
-                <td className="tabular">{checks.length}</td>
-                <td>Total checks in the registry</td>
-                <td className="tabular">{checks.length}</td>
-              </tr>
-            </tbody>
-          </table>
-          <p>
-            The count in the last row is the size of the registry in {SITE.name}. It is
-            printed from the array itself, so it cannot disagree with the scan.
-          </p>
-        </div>
+        <p className="mt-3" style={{ fontSize: 14.5, color: "var(--muted-foreground)", maxWidth: "62ch" }}>
+          Every check in the registry falls into one of three weights. The counts are printed
+          from the registry itself, so they cannot disagree with the scan.
+        </p>
+        <ul className="box-grid mt-5">
+          {([3, 2, 1] as const).map((weight, index) => {
+            const members = checks.filter((c) => c.weight === weight);
+            return (
+              <li key={weight} className="box rise" style={{ ["--i" as string]: index }}>
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="stat" style={{ fontSize: 24 }}>
+                    {weight}
+                  </span>
+                  <span className="chip tabular">{members.length} checks</span>
+                </div>
+                <p className="box__body">{WEIGHT_MEANING[weight]}</p>
+              </li>
+            );
+          })}
+        </ul>
       </section>
       </div>
     </SiteShell>

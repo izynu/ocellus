@@ -24,6 +24,15 @@ import { techStack } from "./tech-stack";
 import { threatIntel } from "./threat-intel";
 import { performance } from "./performance";
 import { darkPatterns } from "./dark-patterns";
+import { whois } from "./whois";
+import { dnsHygiene } from "./dns-hygiene";
+import { archiveHistory } from "./archive-history";
+import { popularity } from "./popularity";
+import { vulnerabilityExposure } from "./vulnerability-exposure";
+import { certificateRevocation } from "./certificate-revocation";
+import { edgeProtection } from "./edge-protection";
+import { blocklist } from "./blocklist";
+import { breachHistory } from "./breach-history";
 
 /**
  * Order is the report order: the transport and name layer first, then what the
@@ -32,15 +41,24 @@ import { darkPatterns } from "./dark-patterns";
 export const checks: CheckDefinition[] = [
   dnsRecords,
   dnssec,
+  whois,
+  dnsHygiene,
   ctLogs,
+  certificateRevocation,
   redirects,
   securityHeaders,
+  edgeProtection,
   emailAuth,
   securityTxt,
   infrastructure,
+  vulnerabilityExposure,
   subdomains,
   techStack,
   threatIntel,
+  blocklist,
+  breachHistory,
+  archiveHistory,
+  popularity,
   privacy,
   markup,
   seo,

@@ -535,7 +535,9 @@ pre,
 
 /*
  * One entrance animation, used once per view: a short rise with no bounce.
- * Anything more competes with the data, which is the thing being read.
+ * Anything more competes with the data, which is the thing being read. The
+ * stagger is carried by `--i` in the boxes section below, so there is one
+ * timing curve in the whole product rather than a class per depth.
  */
 @keyframes rise {
   from {
@@ -551,11 +553,6 @@ pre,
 .rise {
   animation: rise 420ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
-
-.rise-1 { animation-delay: 60ms; }
-.rise-2 { animation-delay: 120ms; }
-.rise-3 { animation-delay: 180ms; }
-.rise-4 { animation-delay: 240ms; }
 
 @keyframes sweep {
   from { transform: translateX(-100%); }
@@ -627,4 +624,223 @@ pre,
 
 .skip-link:focus {
   top: 16px;
+}
+
+/* ------------------------------------------------------------------ boxes -- */
+
+/*
+ * The report and every index page are built from boxes rather than tables or
+ * long prose. A box is one fact with a status, a title and a sentence: it can be
+ * scanned in a grid, read alone on a phone, and compared against its neighbours
+ * without a column header to remember.
+ *
+ * The material is the opaque sheet, not glass. Glass belongs to chrome that
+ * floats over the scene; a box is content, and content stays readable.
+ */
+.box {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 15px 17px;
+  min-width: 0;
+  position: relative;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.box--raised {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 16px 34px -26px rgb(0 0 0 / 0.9);
+}
+
+/* A box that is itself a control lifts by a single pixel. No scale, no glow. */
+.box--link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.box--link:hover {
+  border-color: color-mix(in oklab, var(--primary) 45%, var(--border));
+  transform: translateY(-1px);
+}
+
+.box--link:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/*
+ * A 3px status rail down the left edge. This is the only place a status colour
+ * is used as a surface: it lets a reader find the failures in a grid of twenty
+ * boxes without reading a word.
+ */
+.box--railed {
+  border-left-width: 3px;
+}
+
+.box--railed.tone-pass { border-left-color: var(--signal-pass); }
+.box--railed.tone-warn { border-left-color: var(--signal-warn); }
+.box--railed.tone-fail { border-left-color: var(--signal-fail); }
+.box--railed.tone-info { border-left-color: var(--signal-info); }
+.box--railed.tone-idle { border-left-color: var(--signal-idle); }
+
+.box-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 248px), 1fr));
+  gap: 12px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.box-grid--wide {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+}
+
+.box__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.box__title {
+  font-size: 14.5px;
+  font-weight: 580;
+  letter-spacing: -0.005em;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.box__body {
+  margin-top: 6px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+}
+
+.box__meta {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  font-size: 11.5px;
+  color: var(--muted-foreground);
+}
+
+/* A big number with a label under it, used for the score and the counts. */
+.stat {
+  font-size: 30px;
+  font-weight: 620;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+/*
+ * The measured values behind a check: label on the left, value on the right,
+ * two columns that stay aligned down the box. It is a definition list because
+ * that is what it is, and the columns are a grid so a long value wraps inside
+ * its own cell rather than pushing the label off the edge.
+ */
+.facts {
+  margin: 10px 0 0;
+  padding: 9px 0 0;
+  border-top: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  gap: 5px 14px;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.facts dt {
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+}
+
+.facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* A thin proportional bar. Width is set inline; the transition animates it. */
+.meter {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.meter__fill {
+  height: 100%;
+  border-radius: 2px;
+  background: currentColor;
+  transform-origin: left center;
+  animation: meter-grow 620ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@keyframes meter-grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+/* --------------------------------------------------------------- motion -- */
+
+/*
+ * `--i` staggers siblings without a second class per item: a grid sets
+ * `style={{ "--i": index }}` and every box rises 45ms after the one before it.
+ * The whole stagger is capped by the item count, so a 30-box grid still settles
+ * inside a quarter of a second.
+ */
+.rise {
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+@keyframes draw {
+  to { stroke-dashoffset: 0; }
+}
+
+/* The score ring draws itself once, then holds. */
+.ring__track {
+  stroke: var(--muted);
+}
+
+.ring__value {
+  stroke-linecap: round;
+  animation: draw 900ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@keyframes bar-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Rows that land while a scan is running. */
+.land {
+  animation: bar-in 300ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/*
+ * A box that is waiting on its source. The shimmer is a 1px highlight moving
+ * across the top edge, not a skeleton block: the box already carries the real
+ * title, so there is nothing to fake.
+ */
+@keyframes await {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+.awaiting::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--primary), transparent);
+  animation: await 1.6s ease-in-out infinite;
 }

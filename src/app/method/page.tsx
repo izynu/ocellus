@@ -1,4 +1,3 @@
-import type { CSSProperties } from "react";
 import Link from "next/link";
 import { SiteShell } from "@/components/site/site-shell";
 import { checks, GROUP_ORDER } from "@/lib/checks";
@@ -37,6 +36,36 @@ const SOURCES = [
     href: "https://crt.sh/",
     what: "Certificates issued for the domain, their issuers, validity windows, and the hostnames they name.",
     how: "Certificate Transparency index, JSON output.",
+  },
+  {
+    name: "rdap.org",
+    href: "https://rdap.org/",
+    what: "The registration record: when the domain was registered, when it expires, the registrar, the registry status flags and the nameservers.",
+    how: "RDAP, the JSON successor to WHOIS, redirected to the registry for the TLD.",
+  },
+  {
+    name: "archive.org Wayback",
+    href: "https://web.archive.org/",
+    what: "The earliest and most recent capture of the address, which bounds how long the site has existed in public.",
+    how: "Availability API, one query for each end of the range.",
+  },
+  {
+    name: "Tranco",
+    href: "https://tranco-list.eu/",
+    what: "The domain's daily rank in a research list built from four providers, used as context rather than as a verdict.",
+    how: "Keyless JSON endpoint.",
+  },
+  {
+    name: "CISA Known Exploited Vulnerabilities",
+    href: "https://www.cisa.gov/known-exploited-vulnerabilities-catalog",
+    what: "Whether the product named in the response appears in the catalogue of vulnerabilities with confirmed exploitation in the wild.",
+    how: "Single JSON feed, matched by product name.",
+  },
+  {
+    name: "FIRST EPSS",
+    href: "https://www.first.org/epss/",
+    what: "The estimated probability that a matched CVE is exploited in the next 30 days, with its percentile.",
+    how: "Keyless JSON endpoint, queried in one batch per scan.",
   },
   {
     name: "api.hackertarget.com",
@@ -112,6 +141,21 @@ const SPECS = [
     used: "DMARC policy, alignment and reporting addresses.",
   },
   {
+    label: "RFC 9460, SVCB and HTTPS records",
+    href: "https://datatracker.ietf.org/doc/html/rfc9460",
+    used: "The apex HTTPS record that tells a client which protocols and endpoints the origin supports.",
+  },
+  {
+    label: "RFC 8460, TLS reporting",
+    href: "https://datatracker.ietf.org/doc/html/rfc8460",
+    used: "The _smtp._tls record that reports failed TLS negotiation to mail hosts.",
+  },
+  {
+    label: "RFC 9083, RDAP",
+    href: "https://datatracker.ietf.org/doc/html/rfc9083",
+    used: "The registration record format used in place of WHOIS.",
+  },
+  {
     label: "RFC 6376, DKIM",
     href: "https://www.rfc-editor.org/rfc/rfc6376.html",
     used: "Selector records and key material published in DNS.",
@@ -176,49 +220,33 @@ export default function MethodPage() {
         </p>
       </div>
 
-      <div className="sheet mt-5 overflow-x-auto">
-        <table
-          style={{
-            width: "100%",
-            borderCollapse: "collapse",
-            fontSize: 14.5,
-            minWidth: 560,
-          }}
-        >
-          <caption className="sr-only">Data sources, what each supplies, and how it is queried</caption>
-          <thead>
-            <tr>
-              <th scope="col" style={thStyle}>
-                Source
-              </th>
-              <th scope="col" style={thStyle}>
-                Used for
-              </th>
-              <th scope="col" style={thStyle}>
-                Access
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {SOURCES.map((source) => (
-              <tr key={source.name}>
-                <td style={tdStyle}>
-                  <a
-                    href={source.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ color: "var(--primary)" }}
-                  >
-                    {source.name}
-                  </a>
-                </td>
-                <td style={{ ...tdStyle, color: "var(--muted-foreground)" }}>{source.what}</td>
-                <td style={{ ...tdStyle, color: "var(--muted-foreground)" }}>{source.how}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <ul className="box-grid box-grid--wide mt-5">
+        {SOURCES.map((source, index) => (
+          <li
+            key={source.name}
+            className="box rise"
+            style={{ ["--i" as string]: Math.min(index, 10) }}
+          >
+            <div className="box__head">
+              <span className="dot tone-info" aria-hidden="true" />
+              <h3 className="box__title">
+                <a
+                  href={source.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: "var(--primary)", textDecoration: "none" }}
+                >
+                  {source.name}
+                </a>
+              </h3>
+            </div>
+            <p className="box__body">{source.what}</p>
+            <div className="box__meta">
+              <span>{source.how}</span>
+            </div>
+          </li>
+        ))}
+      </ul>
 
       <div className="prose mt-10">
         <h2>How the score is computed</h2>
@@ -234,44 +262,44 @@ export default function MethodPage() {
           If no check produced a verdict, the score is 0 and the grade is F, and the report says
           that nothing could be measured.
         </p>
-        <table>
-          <thead>
-            <tr>
-              <th scope="col">Status</th>
-              <th scope="col">Fraction of weight</th>
-              <th scope="col">Meaning</th>
-            </tr>
-          </thead>
-          <tbody>
-            {FRACTIONS.map((row) => (
-              <tr key={row.status}>
-                <td className="mono">{row.status}</td>
-                <td className="tabular">{row.value}</td>
-                <td>{row.note}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <ul className="box-grid not-prose mt-4">
+          {FRACTIONS.map((row, index) => (
+            <li
+              key={row.status}
+              className="box box--railed rise tone-idle"
+              style={{ ["--i" as string]: index }}
+            >
+              <div className="box__head">
+                <span className="box__title mono">{row.status}</span>
+                <span className="chip tabular" style={{ marginLeft: "auto" }}>
+                  {row.value}
+                </span>
+              </div>
+              <p className="box__body">{row.note}</p>
+            </li>
+          ))}
+        </ul>
         <p>
           The resulting score maps to a grade by fixed bands. There are no curves, no
           per-site adjustments and no hidden bonuses.
         </p>
-        <table>
-          <thead>
-            <tr>
-              <th scope="col">Grade</th>
-              <th scope="col">Score</th>
-            </tr>
-          </thead>
-          <tbody>
-            {GRADES.map((row) => (
-              <tr key={row.grade}>
-                <td style={{ fontWeight: 600 }}>{row.grade}</td>
-                <td className="tabular">{row.band}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <ul className="box-grid not-prose mt-4">
+          {GRADES.map((row, index) => (
+            <li key={row.grade} className="box rise" style={{ ["--i" as string]: index }}>
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="stat" style={{ fontSize: 24 }}>
+                  {row.grade}
+                </span>
+                <span
+                  className="tabular"
+                  style={{ fontSize: 13, color: "var(--muted-foreground)" }}
+                >
+                  {row.band}
+                </span>
+              </div>
+            </li>
+          ))}
+        </ul>
 
         <h2>Why unavailable is not a pass</h2>
         <p>
@@ -281,8 +309,8 @@ export default function MethodPage() {
           than a site that answers honestly and has a weak header. It would also make the score
           rise as the scan learned less. So an unavailable check is removed from the arithmetic
           entirely, the report prints the count of checks that could not run, and the score is
-          described as being computed over the checks that did. A site with four passes and
-          twelve unavailable checks gets an A on four checks, not an A on sixteen.
+          described as being computed over the checks that did. A scan where four checks answered
+          and the rest could not run is an A on four checks, not an A on the full set.
         </p>
 
         <h2>The limits</h2>
@@ -323,40 +351,26 @@ export default function MethodPage() {
         </p>
       </div>
 
-      <div className="sheet mt-5 overflow-x-auto">
-        <table
-          style={{ width: "100%", borderCollapse: "collapse", fontSize: 14.5, minWidth: 520 }}
-        >
-          <caption className="sr-only">Specifications cited by checks</caption>
-          <thead>
-            <tr>
-              <th scope="col" style={thStyle}>
-                Specification
-              </th>
-              <th scope="col" style={thStyle}>
-                Applied to
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {SPECS.map((spec) => (
-              <tr key={spec.href}>
-                <td style={tdStyle}>
-                  <a
-                    href={spec.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ color: "var(--primary)" }}
-                  >
-                    {spec.label}
-                  </a>
-                </td>
-                <td style={{ ...tdStyle, color: "var(--muted-foreground)" }}>{spec.used}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <ul className="box-grid box-grid--wide mt-5">
+        {SPECS.map((spec, index) => (
+          <li key={spec.href} className="box rise" style={{ ["--i" as string]: Math.min(index, 10) }}>
+            <div className="box__head">
+              <span className="dot tone-idle" aria-hidden="true" />
+              <h3 className="box__title">
+                <a
+                  href={spec.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: "var(--primary)", textDecoration: "none" }}
+                >
+                  {spec.label}
+                </a>
+              </h3>
+            </div>
+            <p className="box__body">{spec.used}</p>
+          </li>
+        ))}
+      </ul>
 
       <div className="prose mt-10">
         <p>
@@ -370,22 +384,3 @@ export default function MethodPage() {
     </SiteShell>
   );
 }
-
-const thStyle: CSSProperties = {
-  textAlign: "left",
-  fontWeight: 600,
-  fontSize: 11.5,
-  letterSpacing: "0.08em",
-  textTransform: "uppercase",
-  color: "var(--muted-foreground)",
-  padding: "12px 16px",
-  borderBottom: "1px solid var(--border)",
-  whiteSpace: "nowrap",
-};
-
-const tdStyle: CSSProperties = {
-  padding: "12px 16px",
-  borderBottom: "1px solid color-mix(in oklab, var(--border) 60%, transparent)",
-  verticalAlign: "top",
-  lineHeight: 1.55,
-};

@@ -182,10 +182,10 @@ export function ScanWorkspace() {
 
       {previous && phase !== "running" && !report && (
         <div
-          className="sheet"
+          className="box rise"
           style={{
             marginTop: 16,
-            padding: "10px 14px",
+            padding: "12px 15px",
             display: "flex",
             flexWrap: "wrap",
             alignItems: "center",
@@ -292,18 +292,31 @@ export function ScanWorkspace() {
             first results are visible before the slowest one finishes.
           </p>
 
-          <h2 className="eyebrow" style={{ marginTop: 22 }}>
+          <h2 className="eyebrow" style={{ marginTop: 24 }}>
             What it looks at
           </h2>
-          <ul
-            className="flex flex-wrap gap-2"
-            style={{ marginTop: 10, listStyle: "none", padding: 0 }}
-          >
-            {GROUP_ORDER.map((group) => (
-              <li key={group}>
-                <span className="chip">{GROUP_LABEL[group]}</span>
-              </li>
-            ))}
+          <ul className="box-grid" style={{ marginTop: 12 }}>
+            {GROUP_ORDER.map((group, index) => {
+              const members = checks.filter((c) => c.group === group);
+              return (
+                <li
+                  key={group}
+                  className="box rise"
+                  style={{ ["--i" as string]: index, padding: "12px 14px" }}
+                >
+                  <div className="box__head">
+                    <span className="box__title" style={{ fontSize: 13.5 }}>
+                      {GROUP_LABEL[group]}
+                    </span>
+                  </div>
+                  <div className="box__meta">
+                    <span className="tabular">
+                      {members.length} {members.length === 1 ? "check" : "checks"}
+                    </span>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
@@ -316,17 +329,12 @@ export function ScanWorkspace() {
             aria-valuemin={0}
             aria-valuemax={progress.total}
             aria-valuenow={progress.done}
-            style={{
-              height: 6,
-              borderRadius: 3,
-              background: "var(--muted)",
-              border: "1px solid var(--border)",
-              overflow: "hidden",
-            }}
+            className="meter"
+            style={{ height: 6 }}
           >
             <div
+              className="meter__fill"
               style={{
-                height: "100%",
                 width: `${percent}%`,
                 background: "var(--primary)",
                 transition: "width 220ms ease",
@@ -342,44 +350,37 @@ export function ScanWorkspace() {
           </p>
 
           {results.length > 0 && (
-            <ol
-              className="divide-y divide-border"
-              style={{ marginTop: 10, listStyle: "none", padding: 0 }}
-            >
+            <ul className="box-grid" style={{ marginTop: 14 }}>
               {results.map((result) => (
                 <li
                   key={result.id}
-                  className="rise"
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: 10,
-                    padding: "9px 0",
-                    minWidth: 0,
-                  }}
+                  className={`box box--railed land ${statusTone(result.status)}`}
                 >
-                  <span
-                    className={`dot ${statusTone(result.status)}`}
-                    role="img"
-                    aria-label={statusLabel(result.status)}
-                    style={{ marginTop: 7 }}
-                  />
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 560 }}>{result.title}</div>
-                    <p
-                      className="truncate-2"
-                      style={{
-                        fontSize: 13,
-                        color: "var(--muted-foreground)",
-                        overflowWrap: "anywhere",
-                      }}
-                    >
-                      {result.headline}
-                    </p>
+                  <div className="box__head">
+                    <span
+                      className="dot"
+                      role="img"
+                      aria-label={statusLabel(result.status)}
+                    />
+                    <span className="box__title">{result.title}</span>
                   </div>
+                  <p className="box__body truncate-2">{result.headline}</p>
                 </li>
               ))}
-            </ol>
+              {progress.done < progress.total && (
+                <li className="box awaiting" aria-hidden="true">
+                  <div className="box__head">
+                    <span className="dot tone-idle" />
+                    <span className="box__title" style={{ color: "var(--muted-foreground)" }}>
+                      Waiting on the next source
+                    </span>
+                  </div>
+                  <p className="box__body">
+                    The slowest checks are the certificate index and the document reader.
+                  </p>
+                </li>
+              )}
+            </ul>
           )}
         </div>
       )}

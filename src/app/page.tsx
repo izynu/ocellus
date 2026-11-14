@@ -25,20 +25,21 @@ export const metadata = {
  */
 const GROUP_NOTE: Record<CheckGroup, string> = {
   transport:
-    "Which certificates have been issued for the domain, and every hop between the address you typed and the page that answered.",
-  dns: "The records the zone publishes for address, mail and name service, and whether the resolver validated them with DNSSEC.",
+    "Which certificates have been issued for the domain, by which authorities, which of them were revoked, and every hop between the address you typed and the page that answered.",
+  dns: "The records the zone publishes for address, mail and name service, when the registration began and expires, whether a wildcard answers for names nobody registered, and whether the resolver validated them with DNSSEC.",
   headers:
-    "Which protective response headers are set and whether each value is correct, plus whether the site publishes a current security contact.",
+    "Which protective response headers are set and whether each value is correct, whether the site publishes a current security contact, and which CDN, proxy or firewall sits in front of the origin.",
   email:
     "Whether mail claiming to be from this domain can be authenticated, and whether anyone else can forge it.",
   infrastructure:
-    "The address behind the host, the network that announces it, the ports an outside index has seen open, the hostnames under the domain, and the software the response names.",
+    "The address behind the host, the network that announces it, the ports an outside index has seen open, the hostnames under the domain, and whether the software the response names appears in the catalogue of exploited vulnerabilities.",
   privacy: "What the response sets and the document loads before a visitor has agreed to anything.",
   content:
     "Document structure as assistive technology reads it: headings, alternative text, form labels, language and duplicate identifiers.",
   performance: "What the document weighs and what the server says about compression and caching.",
   seo: "Whether a crawler can reach the site, and what a search result or a link preview will show.",
-  threat: "Threat intelligence records that name the domain or the address behind it.",
+  threat:
+    "Threat intelligence that names the domain, whether a filtering resolver refuses to resolve it, how widely it is seen in traffic, and whether the operator has appeared in a disclosed breach.",
   ux: "Interface patterns that obstruct or mislead a person, as far as they can be read from markup alone.",
 };
 
@@ -160,23 +161,25 @@ export default function HomePage() {
           might imply.
         </p>
 
-        <ul className="mt-7 grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2 lg:grid-cols-3">
-          {GROUP_ORDER.map((group) => {
+        <ul className="box-grid box-grid--wide mt-7">
+          {GROUP_ORDER.map((group, index) => {
             const members = groupOf(group);
             return (
-              <li key={group} className="sheet sheet--raised p-5">
-                <div className="flex items-baseline justify-between gap-3">
-                  <h3 style={{ fontSize: 15.5 }}>{GROUP_LABEL[group]}</h3>
-                  <span className="chip tabular">
+              <li
+                key={group}
+                className="box box--raised rise"
+                style={{ ["--i" as string]: index }}
+              >
+                <div className="box__head">
+                  <span className="dot tone-info" aria-hidden="true" />
+                  <h3 className="box__title">{GROUP_LABEL[group]}</h3>
+                </div>
+                <p className="box__body">{GROUP_NOTE[group]}</p>
+                <div className="box__meta">
+                  <span className="tabular">
                     {members.length} {members.length === 1 ? "check" : "checks"}
                   </span>
                 </div>
-                <p
-                  className="mt-2"
-                  style={{ fontSize: 14.5, lineHeight: 1.55, color: "var(--muted-foreground)" }}
-                >
-                  {GROUP_NOTE[group]}
-                </p>
               </li>
             );
           })}
@@ -196,29 +199,21 @@ export default function HomePage() {
           difference between the last two matters more than the first three.
         </p>
 
-        <div className="sheet mt-7 overflow-hidden">
-          <dl className="m-0">
-            {STATUSES.map((status, index) => (
-              <div
-                key={status.name}
-                className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-baseline sm:gap-6 md:px-6"
-                style={{
-                  borderTop: index === 0 ? "none" : "1px solid var(--border)",
-                }}
-              >
-                <dt className="sm:w-40 sm:flex-none">
-                  <span className="chip">
-                    <span className={`dot ${status.tone}`} aria-hidden="true" />
-                    <span className={status.tone}>{status.name}</span>
-                  </span>
-                </dt>
-                <dd className="m-0" style={{ fontSize: 15 }}>
-                  {status.meaning}
-                </dd>
+        <ul className="box-grid mt-7">
+          {STATUSES.map((status, index) => (
+            <li
+              key={status.name}
+              className={`box box--railed rise ${status.tone}`}
+              style={{ ["--i" as string]: index }}
+            >
+              <div className="box__head">
+                <span className="dot" aria-hidden="true" />
+                <span className={`box__title mono ${status.tone}`}>{status.name}</span>
               </div>
-            ))}
-          </dl>
-        </div>
+              <p className="box__body">{status.meaning}</p>
+            </li>
+          ))}
+        </ul>
 
         <p
           className="mt-4"
@@ -238,7 +233,7 @@ export default function HomePage() {
         <h2 id="cannot" style={{ fontSize: 24 }}>
           What it cannot do
         </h2>
-        <div className="sheet mt-7 p-6 md:p-8">
+        <div className="box box--raised mt-7" style={{ padding: "20px 22px" }}>
           <ul className="m-0 list-none space-y-4 p-0">
             {LIMITS.map((limit) => (
               <li key={limit} className="flex gap-3">
@@ -259,27 +254,26 @@ export default function HomePage() {
         <h2 id="works" style={{ fontSize: 24 }}>
           How it works
         </h2>
-        <ol className="mt-7 grid list-none grid-cols-1 gap-3 p-0 md:grid-cols-3">
+        <ol className="box-grid mt-7">
           {STEPS.map((step, index) => (
-            <li key={step.title} className="sheet p-6">
+            <li
+              key={step.title}
+              className="box box--raised rise"
+              style={{ ["--i" as string]: index }}
+            >
               <div className="flex items-center gap-3">
                 <span
                   className="mono tabular"
-                  style={{ fontSize: 13, color: "var(--muted-foreground)" }}
+                  style={{ fontSize: 12, color: "var(--muted-foreground)" }}
                 >
                   {String(index + 1).padStart(2, "0")}
                 </span>
                 <hr className="hairline m-0 flex-1" />
               </div>
-              <h3 className="mt-4" style={{ fontSize: 16.5 }}>
+              <h3 className="box__title" style={{ marginTop: 10 }}>
                 {step.title}
               </h3>
-              <p
-                className="mt-2"
-                style={{ fontSize: 14.5, lineHeight: 1.55, color: "var(--muted-foreground)" }}
-              >
-                {step.body}
-              </p>
+              <p className="box__body">{step.body}</p>
             </li>
           ))}
         </ol>
@@ -287,7 +281,7 @@ export default function HomePage() {
 
       {/* ----------------------------------------------------------- closing -- */}
       <section className="mt-16 md:mt-24" aria-labelledby="closing">
-        <div className="sheet sheet--raised p-6 md:p-8">
+        <div className="box box--raised mt-7" style={{ padding: "20px 22px" }}>
           <h2 id="closing" style={{ fontSize: 19 }}>
             The rules are published, not implied.
           </h2>
