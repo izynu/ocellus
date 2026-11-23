@@ -5,16 +5,16 @@
 ### [Open Ocellus](https://izynu.github.io/ocellus/) &nbsp;|&nbsp; [Scan](https://izynu.github.io/ocellus/scan/) &nbsp;|&nbsp; [Checks](https://izynu.github.io/ocellus/checks/) &nbsp;|&nbsp; [Sources](https://izynu.github.io/ocellus/sources/) &nbsp;|&nbsp; [Dorks](https://izynu.github.io/ocellus/dorks/) &nbsp;|&nbsp; [Method](https://izynu.github.io/ocellus/method/)
 
 <a href="https://github.com/izynu/ocellus/blob/main/LICENSE"><img src="https://img.shields.io/static/v1?label=licence&message=MIT&color=38d2b6&style=flat-square" alt="Licence: MIT"></a>
-<img src="https://img.shields.io/static/v1?label=checks&message=32&color=38d2b6&style=flat-square" alt="32 checks">
+<img src="https://img.shields.io/static/v1?label=checks&message=34&color=38d2b6&style=flat-square" alt="34 checks">
 <img src="https://img.shields.io/static/v1?label=sources&message=120%20catalogued&color=38d2b6&style=flat-square" alt="120 sources catalogued">
 <img src="https://img.shields.io/static/v1?label=key&message=none%20needed&color=38d2b6&style=flat-square" alt="No API key needed">
 <img src="https://img.shields.io/static/v1?label=runs&message=in%20your%20browser&color=38d2b6&style=flat-square" alt="Runs in your browser">
 
 </div>
 
-Ocellus is a website audit and reconnaissance console that runs entirely in the visitor's browser. You type a hostname, and 32 fixed checks read it from the outside with the tools a careful analyst would use: the DNS zone, the certificate logs, the response headers, the mail policy records, the public reputation feeds, the page markup, the trackers it loads, and the software it names. Each check answers one question, and the report shows the measured value, the source that supplied it, and the status. It refuses to invent: a value is either what a named public source returned, or an explicit statement that the source could not be reached. There is no backend, no account, no API key, and no database, and a check that cannot run is removed from the score rather than counted as a pass.
+Ocellus is a website audit and reconnaissance console that runs entirely in the visitor's browser. You type a hostname, and 34 fixed checks read it from the outside with the tools a careful analyst would use: the DNS zone, the certificate logs, the response headers, the mail policy records, the public reputation feeds, the page markup, the trackers it loads, and the software it names. Each check answers one question, and the report shows the measured value, the source that supplied it, and the status. It refuses to invent: a value is either what a named public source returned, or an explicit statement that the source could not be reached. There is no backend, no account, no API key, and no database, and a check that cannot run is removed from the score rather than counted as a pass.
 
-<img src=".github/assets/pipeline.svg" alt="A left-to-right scan flow: your browser sends requests, CORS-open public sources answer, 32 checks resolve one at a time, and a categorised report marks each one pass, warn, fail or unavailable, with the score weights shown for each status." width="100%">
+<img src=".github/assets/pipeline.svg" alt="A left-to-right scan flow: your browser sends requests, CORS-open public sources answer, 34 checks resolve one at a time, and a categorised report marks each one pass, warn, fail or unavailable, with the score weights shown for each status." width="100%">
 
 <details>
 <summary><b>Contents</b></summary>
@@ -37,9 +37,42 @@ Ocellus is a website audit and reconnaissance console that runs entirely in the 
 
 ---
 
+## Six working tools
+
+The product is organised by what you can do, and every tool below runs in the browser.
+
+| Tool | What it does | Where |
+| --- | --- | --- |
+| **Site scan** | 34 checks across 12 categories against one hostname, results streaming in as each source answers | [`/scan`](https://izynu.github.io/ocellus/scan/) |
+| **URL and file scanner** | A live verdict from Google Safe Browsing and OpenPhish, the page it returns, and a local SHA-256 hash lookup so a file is never uploaded | [`/url-scan`](https://izynu.github.io/ocellus/url-scan/) |
+| **Ports and Nmap** | A full staged sweep of every public index in nmapAutomator's order, plus the exact nmap and nmapAutomator command per stage | [`/ports`](https://izynu.github.io/ocellus/ports/) |
+| **Recon workflow** | The eight-phase sequence, each phase linking to the tool that carries it out | [`/recon`](https://izynu.github.io/ocellus/recon/) |
+| **Dork generator** | 82 queries across Google, Bing, DuckDuckGo, Shodan, GitHub and Censys, filled in for your domain | [`/dorks`](https://izynu.github.io/ocellus/dorks/) |
+| **Source catalogue** | 120 indexes, APIs and scanners, each stating why a browser can or cannot reach it | [`/sources`](https://izynu.github.io/ocellus/sources/) |
+
+### What the sweep can and cannot do
+
+A browser cannot send a SYN packet, so no page can port-scan. The `/ports` tool does the honest equivalent: it runs the same seven stages nmapAutomator runs, against the public indexes that recorded what an active scan would have found, and reports each stage with a real answer or a real gap. Then it writes the nmap command that does the stage for real on your own machine.
+
+| Stage | Runs in the page | The command it gives you |
+| --- | --- | --- |
+| Resolve | DNS over HTTPS | `nmap -sn` |
+| Name service | NS records | `dig NS` |
+| Ownership | RIPEstat, registry | `whois` |
+| Observed ports | Shodan InternetDB | `nmap -sS --top-ports 1000` |
+| Services | CPE and CVE ids | `nmap -sV -sC -p-` |
+| Reverse name | PTR records | `dig -x` |
+| HTTP | Header proxy | `nmap --script http-*` |
+
+### Bring your own keys
+
+Four sources need a key and a static page cannot ship one. The scan has a key panel: paste your own Shodan, Censys, urlscan or VirusTotal key, and it is stored in that browser only, sent only to the service it belongs to, and never written into a report. Shodan, Censys and urlscan then run as real checks. VirusTotal is listed with the truth: its API sends no cross-origin header, so a page cannot read it even with a valid key, and the check says so instead of pretending.
+
+---
+
 ## Features, by group
 
-A scan runs **32 fixed checks across 12 groups**. The groups are ordered from the transport and name layer outward to the page and its reputation. Every title below is the real check title read from the registry in [`src/lib/checks/index.ts`](src/lib/checks/index.ts), so this list cannot drift from the product.
+A scan runs **34 fixed checks across 12 groups**. The groups are ordered from the transport and name layer outward to the page and its reputation. Every title below is the real check title read from the registry in [`src/lib/checks/index.ts`](src/lib/checks/index.ts), so this list cannot drift from the product.
 
 ### Transport and certificates
 What was issued for the name, whether it is still trusted, and every hop the request takes.
@@ -125,7 +158,7 @@ Whether the page uses manipulative interface patterns against the visitor.
 
 ## Every category, at a glance
 
-<img src=".github/assets/categories.svg" alt="Twelve tiles in the site's own group colours, each naming a check group and its real check count: transport 3, name system 6, headers 3, email 1, infrastructure 5, reconnaissance 2, privacy 1, content and accessibility 1, performance 2, search and preview 1, reputation 6, interface friction 1, totalling 32." width="100%">
+<img src=".github/assets/categories.svg" alt="Twelve tiles in the site's own group colours, each naming a check group and its real check count: transport 3, name system 6, headers 3, email 1, infrastructure 5, reconnaissance 2, privacy 1, content and accessibility 1, performance 2, search and preview 1, reputation 6, interface friction 1, totalling 34." width="100%">
 
 | Group | Checks | What it determines |
 | --- | :--: | --- |
