@@ -101,16 +101,30 @@ export class DnsResolver {
     return promise;
   }
 
-  /** Convenience: the `data` strings for one record type. */
+  /**
+   * Convenience: the `data` strings for one record type.
+   *
+   * Returns an empty array both for "no record of this type" and for a failed
+   * lookup, so a caller must not treat emptiness as absence. Prefer `query()`
+   * and read `failed` and `status` through `answeredDefinitively()`.
+   */
   async values(name: string, type: RecordType): Promise<string[]> {
     const res = await this.query(name, type);
     return res.answers.filter((a) => a.type === TYPE_NAMES_REVERSE[type]).map((a) => a.data);
   }
 
-  /** True when the name has any record of that type. */
+  /**
+   * True only when the resolver definitely returned a record of that type.
+   *
+   * False covers both "the name has no such record" and "the lookup failed",
+   * because the return type cannot say which. It is safe to use as "not found"
+   * only when the negative verdict does not matter; anything that would report
+   * a missing record must call `query()` and check `failed` first. No check in
+   * the registry calls this method today.
+   */
   async exists(name: string, type: RecordType): Promise<boolean> {
     const res = await this.query(name, type);
-    return res.status === 0 && res.answers.length > 0;
+    return res.status === DNS_NOERROR && res.answers.length > 0;
   }
 
   private async resolve(name: string, type: RecordType): Promise<DnsResponse> {

@@ -13,7 +13,7 @@
  */
 
 import type { CheckDefinition, CheckResult, Finding } from "../types";
-import { answeredDefinitively } from "../net/dns";
+import { answeredDefinitively, DNS_NXDOMAIN, DNS_SERVFAIL } from "../net/dns";
 
 export type DsRecord = {
   keyTag: number;
