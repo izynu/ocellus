@@ -184,6 +184,26 @@ const TYPE_NAMES_REVERSE: Record<RecordType, number> = {
 /** DNS status codes that mean "the name exists but has no record of this type". */
 export const DNS_NOERROR = 0;
 export const DNS_NXDOMAIN = 3;
+/**
+ * The resolver could not produce an answer. SERVFAIL in particular is what a
+ * validating resolver returns when DNSSEC validation fails, so its empty answer
+ * array is not an absence of records. A `failed` response is different again:
+ * that means no provider answered at all, while SERVFAIL is a real answer from
+ * one. Checks that read record absence must test both.
+ */
+export const DNS_SERVFAIL = 2;
+export const DNS_REFUSED = 5;
+
+/**
+ * True when a response carries a record set that can be read as present or
+ * absent. A failed lookup and a SERVFAIL/REFUSED answer both leave `answers`
+ * empty, so an empty array alone proves nothing; this is the gate a check uses
+ * before treating emptiness as an absence.
+ */
+export function answeredDefinitively(res: DnsResponse): boolean {
+  if (res.failed) return false;
+  return res.status === DNS_NOERROR || res.status === DNS_NXDOMAIN;
+}
 
 /** Join the character-strings of a TXT record and strip the surrounding quotes. */
 export function unquoteTxt(data: string): string {

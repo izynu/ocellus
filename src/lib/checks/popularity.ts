@@ -92,17 +92,26 @@ export const popularity: CheckDefinition = {
     const rows = (res.json.ranks ?? [])
       .filter(
         (r): r is { date: string; rank: number } =>
-          typeof r.date === "string" && typeof r.rank === "number" && Number.isFinite(r.rank)
+          typeof r.date === "string" &&
+          typeof r.rank === "number" &&
+          Number.isFinite(r.rank) &&
+          // A rank is a position in a list, so 0 and negatives are not ranks.
+          // Accepting them would print "ranked 0", which reads as the top of
+          // the list, when the source said nothing usable.
+          r.rank > 0
       )
       .sort((a, b) => b.date.localeCompare(a.date));
 
+    // A missing rank stays null, so it is reported as "not ranked" rather than
+    // filled in with a zero. The two are opposite claims: unranked says the
+    // domain is outside the list, zero says it is at the top of it.
     const latest = rows[0] ?? null;
     const rank = latest?.rank ?? null;
     const bucket = bucketFor(rank);
 
     const headline =
       rank === null
-        ? `${domain} does not appear in the Tranco top one million.`
+        ? `${domain} is not ranked in the Tranco top one million.`
         : `${domain} is ranked ${rank.toLocaleString("en-US")} by Tranco, which places it in the ${bucket} of the web${latest ? `, measured on ${latest.date}` : ""}.`;
 
     // No findings. Popularity is context, and turning it into a verdict would

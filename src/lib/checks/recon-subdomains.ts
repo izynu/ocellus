@@ -40,15 +40,29 @@ export type ReconSubdomainsData = {
   withAddress: Array<{ host: string; address: string }>;
 };
 
-/** Names that suggest a host was never meant to be reachable from the internet. */
-const SENSITIVE_NAME =
-  /(^|\.)(dev|staging|stage|test|uat|qa|internal|intranet|admin|jenkins|gitlab|grafana|kibana|vpn|phpmyadmin|jira|confluence|ldap|sso|corp|db|database|redis|mongo)([.-]|$)/i;
+/**
+ * Names that suggest a host was never meant to be reachable from the internet.
+ *
+ * The shared label test, not a substring regex. The earlier regex matched `s1`
+ * and `dev` anywhere inside a name, so a domain with 550 passive-DNS records was
+ * reported as failing because a handful of hostnames contained a short fragment.
+ * A whole-label match reports a real `dev.example.com` and ignores `s1`.
+ */
+import { looksInternal } from "./ct-logs";
 
 /** Keep the payload a sane size for rendering; the totals stay exact. */
 const DISPLAY_CAP = 150;
 
 /** How many hostnames the headline may count before saying "at least". */
-const HEADLINE_CAP = 1000;
+/**
+ * The count at which a total stops being exact.
+ *
+ * `api.subdomain.center` returns at most about 500 names per query, verified on
+ * example.com, github.com and cloudflare.com, all of which came back at or just
+ * under 500. Once a scan reaches that ceiling the number is a floor, not a
+ * total, and the headline has to say so.
+ */
+const HEADLINE_CAP = 500;
 
 const IPV4 = /^\d{1,3}(\.\d{1,3}){3}$/;
 
@@ -141,6 +155,7 @@ export const reconSubdomains: CheckDefinition = {
     const withAddress: Array<{ host: string; address: string }> = [];
     let fromCenter = 0;
     let fromHackerTarget = 0;
+    let hostSearchQuota = false;
 
     if (centerRes.ok) {
       const names = parseCenter(centerRes.text);
@@ -170,6 +185,11 @@ export const reconSubdomains: CheckDefinition = {
             withAddress.push({ host, address: row.address });
           }
         }
+      } else if (/api count exceeded|quota|membership/i.test(hostSearchRes.text)) {
+        // The free tier is exhausted. Say so rather than counting its zero as
+        // "this index knows nothing", which would understate the surface while
+        // looking like a complete answer.
+        hostSearchQuota = true;
       }
     }
 
@@ -201,7 +221,7 @@ export const reconSubdomains: CheckDefinition = {
     }
 
     const hostnames = [...hostSet].sort();
-    const sensitive = hostnames.filter((host) => SENSITIVE_NAME.test(host));
+    const sensitive = hostnames.filter((host) => looksInternal(host));
 
     const findings: Finding[] = [];
 
@@ -210,12 +230,12 @@ export const reconSubdomains: CheckDefinition = {
         id: "recon-subdomains-sensitive",
         title: `${sensitive.length} hostname${sensitive.length === 1 ? " looks" : "s look"} internal but ${sensitive.length === 1 ? "is" : "are"} public`,
         detail: `Passive DNS has recorded ${sensitive.length} hostname${sensitive.length === 1 ? "" : "s"} under ${domain} whose name suggests it was meant to be internal: ${sensitive.slice(0, 8).join(", ")}${sensitive.length > 8 ? " and others" : ""}. A record here means the name has resolved from the public internet at some point.`,
-        severity: "high",
+        severity: "medium",
         remediation:
           "Confirm each host is meant to be public. If it is not, remove the DNS record and reach it over a VPN or an internal-only name. A passive DNS record does not prove the service is exposed now, but it does show the host existed on the public internet and is worth probing.",
         reference: {
-          label: "CISA: Known Exploited Vulnerabilities catalog",
-          url: "https://www.cisa.gov/known-exploited-vulnerabilities-catalog",
+          label: "OWASP Web Security Testing Guide",
+          url: "https://owasp.org/www-project-web-security-testing-guide/",
         },
         evidence: sensitive.slice(0, 12).map((host) => ({
           label: "Host",
@@ -234,8 +254,16 @@ export const reconSubdomains: CheckDefinition = {
       });
     }
 
-    const serious = findings.some((f) => f.severity === "high" || f.severity === "critical");
-    const status: CheckResult["status"] = serious ? "fail" : findings.length > 0 ? "info" : "pass";
+    // A name that only looks internal is a lead, not a finding of exposure, so
+    // it warns rather than fails. The earlier rule failed the whole check on a
+    // substring match, which marked busy domains as failing for names that were
+    // never internal at all.
+    const actionable = findings.some((f) => f.severity !== "info");
+    const status: CheckResult["status"] = actionable
+      ? "warn"
+      : findings.length > 0
+        ? "info"
+        : "pass";
 
     // The reader service truncates a very long answer, and subdomain.center
     // returns exactly 500 for a domain the size of example.com. A capped list
@@ -252,9 +280,14 @@ export const reconSubdomains: CheckDefinition = {
       "This is passive DNS: a record of names that have resolved at some point, not an inventory of what resolves now. It is a lower bound.",
       "A certificate list and a passive DNS list disagree, so the subdomain surface check on this same scan reads a different source and may report a different set.",
     ];
-    if (partial) {
+    if (partial && !hostSearchQuota) {
       notes.push(
         `Only ${sourcesAnswered.join(" and ")} answered, so the real surface is likely wider than this list.`
+      );
+    }
+    if (hostSearchQuota) {
+      notes.push(
+        "The HackerTarget free quota is exhausted right now, so its index contributed nothing. That is a limit on the request, not a fact about the domain, and the real surface is likely wider than this list."
       );
     }
 

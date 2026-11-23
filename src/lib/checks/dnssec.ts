@@ -13,6 +13,7 @@
  */
 
 import type { CheckDefinition, CheckResult, Finding } from "../types";
+import { answeredDefinitively } from "../net/dns";
 
 export type DsRecord = {
   keyTag: number;
@@ -95,6 +96,35 @@ export const dnssec: CheckDefinition = {
         ms: Math.round(performance.now() - started),
         source: "DNS-over-HTTPS",
         note: "Both public DoH providers failed for at least one record type. Re-running the scan usually succeeds.",
+      };
+    }
+
+    // A resolver can answer with a DNSSEC status that is neither NOERROR nor
+    // NXDOMAIN: SERVFAIL (2) when validation itself fails, or REFUSED (5). Those
+    // answers carry zero records, which looks exactly like "the zone publishes no
+    // DNSKEY", but it is not. A live query for dnssec-failed.org returned DS
+    // NOERROR with one record and DNSKEY SERVFAIL with none; reading the second
+    // as an absent key would have reported a broken delegation as fact, when the
+    // resolver was actually saying it could not validate the zone at all. The
+    // record set is unknown, so the check declines rather than asserts.
+    const readStatuses = (res: typeof dsRes): boolean => answeredDefinitively(res);
+    if (!readStatuses(dsRes) || !readStatuses(keyRes)) {
+      const which = !readStatuses(dsRes) ? "DS" : "DNSKEY";
+      const code = !readStatuses(dsRes) ? dsRes.status : keyRes.status;
+      const why =
+        code === 2
+          ? "the resolver could not validate the zone (SERVFAIL), which is often a DNSSEC misconfiguration rather than an absence of records"
+          : `the resolver answered with status ${code}, which is not a NOERROR or NODATA answer`;
+      return {
+        id: this.id,
+        title: this.title,
+        question: this.question,
+        status: "unavailable",
+        headline: `The DNSSEC lookup for ${domain} did not return a readable ${which} answer.`,
+        findings: [],
+        ms: Math.round(performance.now() - started),
+        source: dsRes.provider === keyRes.provider ? dsRes.provider : "DNS-over-HTTPS",
+        note: `The ${which} query answered with status ${code}: ${why}. An empty answer is not an empty record set here, so no signing verdict is claimed. A SERVFAIL on a signed zone is itself worth checking with a zone validator such as dnsviz.net.`,
       };
     }
 

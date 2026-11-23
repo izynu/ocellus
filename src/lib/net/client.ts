@@ -219,7 +219,7 @@ export function describeFailure(fail: FetchFail, what: string): string {
     case "blocked":
       return `${what} refused the request (${fail.status ?? "no status"}).`;
     case "ratelimited":
-      return `${what} is rate limiting requests. Try again in a minute.`;
+      return `${what} is rate limiting requests from this address. Wait before running the scan again.`;
     case "parse":
       return `${what} returned a response that could not be read.`;
     case "network":

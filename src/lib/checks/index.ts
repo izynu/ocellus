@@ -4,6 +4,16 @@
  * This list is the product surface: the scan page runs it, the /checks page
  * documents it, and the report orders itself by it. Adding a check means
  * adding one import and one entry here.
+ *
+ * Provenance is carried per check, not here: each result's `source` string
+ * names the endpoint it actually queried. Two worth knowing:
+ *
+ *  - `ct-logs` and `subdomains` read the Cert Spotter issuance index, not
+ *    crt.sh. crt.sh sends no CORS header and refuses browser requests, so a
+ *    check built on it measured nothing on any scan.
+ *  - The `dnssec` check reads DS and DNSKEY through Google and Cloudflare DNS
+ *    over HTTPS and reports `unavailable` when a resolver answers SERVFAIL,
+ *    because an empty answer there is not an absent record.
  */
 
 import type { CheckDefinition, CheckGroup } from "../types";

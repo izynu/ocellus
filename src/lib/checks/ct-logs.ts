@@ -1,32 +1,47 @@
 /**
  * Certificate transparency: every certificate ever issued for a domain is
- * published to public CT logs, and crt.sh indexes them. That index answers two
- * questions at once:
+ * published to public CT logs. This check reads a CT aggregator a browser can
+ * actually reach, and answers two questions at once:
  *
  *  - Certificate hygiene: which CAs issued, how long certs last, whether any
  *    were issued for names nobody advertised.
  *  - Subdomain discovery: every hostname that has ever had a certificate,
  *    which is usually more than the site links to.
+ *
+ * The source is Cert Spotter rather than crt.sh. crt.sh is the better known
+ * index and needs no key, but it sends no `Access-Control-Allow-Origin` header
+ * and, verified on 23 November 2026, answered both 502 and 429 to a plain
+ * request. A browser therefore cannot read it at all, and a check built on it
+ * reported "unavailable" on every scan without ever measuring anything. Cert
+ * Spotter answers the same log set over a CORS-open JSON endpoint, so this check
+ * measures something on every run.
  */
 
 import type { CheckDefinition, CheckResult, Finding } from "../types";
 import { describeFailure } from "../net/client";
 
-type CtEntry = {
-  issuer_ca_id: number;
-  issuer_name: string;
-  common_name: string;
-  name_value: string;
-  id: number;
-  /**
-   * No longer sent. A live query for example.com returned 81 entries and not
-   * one of them carried this key, so it is optional rather than a promise the
-   * response does not keep. issuanceTime() falls back to not_before.
-   */
-  entry_timestamp?: string;
-  not_before: string;
-  not_after: string;
-  serial_number: string;
+/**
+ * One issuance from the Cert Spotter v1 API (`/v1/issuances`).
+ *
+ * The base response carries `id`, `not_before`, `not_after` and a `revoked`
+ * boolean. `dns_names` and `issuer` are added by `expand=`; a field not
+ * requested is simply absent, which is why every one here is optional except
+ * the cursor id. Verified against a live response on 23 November 2026.
+ */
+type CertSpotterIssuance = {
+  id: string;
+  tbs_sha256?: string;
+  dns_names?: string[];
+  not_before?: string;
+  not_after?: string;
+  revoked?: boolean;
+  issuer?: {
+    name?: string;
+    friendly_name?: string;
+    o?: string;
+    cn?: string;
+    id?: number;
+  };
 };
 
 export type CtData = {
@@ -46,14 +61,27 @@ export type CtData = {
    */
   longestValidityDays: number;
   wildcards: string[];
+  /**
+   * True when a full page came back, so the index holds more issuances than the
+   * one page read here and every count is a floor rather than a total.
+   * Optional so a reader that predates the field still type-checks.
+   */
+  truncated?: boolean;
 };
 
-function caLabel(issuer: string): string {
-  // "C=US, O=Let's Encrypt, CN=R3" -> "Let's Encrypt R3"
-  const o = /O=([^,]+)/.exec(issuer)?.[1]?.trim();
-  const cn = /CN=([^,]+)/.exec(issuer)?.[1]?.trim();
+/** Turn a Cert Spotter issuer object into a short label. */
+function caLabel(issuer: CertSpotterIssuance["issuer"]): string {
+  if (!issuer) return "Unknown issuer";
+  if (issuer.friendly_name) return issuer.friendly_name.trim();
+  const o = issuer.o?.trim();
+  const cn = issuer.cn?.trim();
   if (o && cn && cn !== o) return `${o} ${cn}`;
-  return cn || o || issuer;
+  if (cn || o) return cn || o || "Unknown issuer";
+  const name = issuer.name ?? "";
+  const parsedO = /O=([^,]+)/.exec(name)?.[1]?.trim();
+  const parsedCn = /CN=([^,]+)/.exec(name)?.[1]?.trim();
+  if (parsedO && parsedCn && parsedCn !== parsedO) return `${parsedO} ${parsedCn}`;
+  return parsedCn || parsedO || name || "Unknown issuer";
 }
 
 function validityDays(notBefore: string, notAfter: string): number {
@@ -64,46 +92,113 @@ function validityDays(notBefore: string, notAfter: string): number {
 }
 
 /**
- * When the certificate was issued.
+ * Whether an issuer is a CA a browser could trust, which is the only kind worth
+ * judging against the validity cap.
  *
- * crt.sh used to return entry_timestamp, the moment the log accepted the
- * certificate, and stopped: a live query for example.com returned 81 entries
- * and not one of them carried the key. not_before is the certificate's own
- * validity start rather than the log's entry time, so the two are not
- * identical, but both date the issuance closely enough to rank certificates by
- * age, and not_before is present on every entry. entry_timestamp stays first in
- * the order so a response that brings it back is used as before.
+ * A live scan of example.com once found two 3,650-day certificates that no
+ * browser trusts and that the site does not serve: one whose issuer name was
+ * the literal "Issuer Not Found" and one from a test intermediate. The finding
+ * built on them was a true statement about a junk log entry and a false
+ * implication about the site, so it is judged only on entries that survive this.
  */
-function issuanceTime(entry: CtEntry): number {
-  const logged = entry.entry_timestamp ? Date.parse(entry.entry_timestamp) : NaN;
-  if (!Number.isNaN(logged)) return logged;
-  return entry.not_before ? Date.parse(entry.not_before) : NaN;
+function isRealIssuer(label: string): boolean {
+  const raw = (label ?? "").trim();
+  if (!raw) return false;
+  if (/unknown issuer/i.test(raw)) return false;
+  if (/issuer not found/i.test(raw)) return false;
+  if (/test|certificate authority of|localhost|self.?signed/i.test(raw)) return false;
+  return true;
 }
 
 /**
- * Whether an issuer is a CA a browser could trust, which is the only kind of
- * issuer worth judging against the validity cap.
+ * The one issuance query the certificate checks share.
  *
- * A live scan of example.com found two 3,650-day certificates that no browser
- * trusts and that the site does not serve: one from 2023-01-27 whose
- * issuer_name is the literal "Issuer Not Found" (crt.sh could not resolve the
- * issuer at all), and one from 2021-08-31 issued by "AS207960 Test
- * Intermediate - example.com". The finding built on them was a true statement
- * about a junk log entry and a false implication about the site, so it is now
- * judged only on entries that survive this filter.
+ * Exported so `subdomains` requests the identical URL and cache key, so the
+ * shared fetch layer serves both checks from one request.
  */
-function isRealIssuer(issuer: string): boolean {
-  const raw = (issuer ?? "").trim();
-  if (!raw) return false;
-  // The placeholder crt.sh writes when its issuer lookup fails. It names a
-  // failed lookup rather than a CA.
-  if (/issuer not found/i.test(raw)) return false;
-  // Test intermediates, enterprise root names, and loopback or self-signed
-  // issuers appear in CT logs but issue nothing a browser accepts.
-  if (/test|certificate authority of|localhost|self.?signed/i.test(raw)) return false;
-  // caLabel can only produce a label from an O= or CN= component. A DN with
-  // neither yields nothing to name the CA with, and no public CA publishes one.
-  return /(^|,)\s*(O|CN)=/i.test(raw);
+export function certificateIndexUrl(domain: string): string {
+  return (
+    `https://api.certspotter.com/v1/issuances?domain=${encodeURIComponent(domain)}` +
+    `&include_subdomains=true&expand=dns_names&expand=issuer&expand=not_before` +
+    `&expand=not_after&expand=cert`
+  );
+}
+
+/**
+ * Fetch the certificate index, surviving the cold-cache timeout.
+ *
+ * Cert Spotter answers a 504 with `{"code":"timeout"}` when a large domain's
+ * query runs past its ten-second budget while the index warms. On 23 November
+ * 2026 a cold query for cloudflare.com returned 504 twice in a row, and a
+ * single-host query for the same name answered 200 in under two seconds. One
+ * delayed retry costs little and sometimes recovers the measurement; if it also
+ * times out the check reports unavailable, which is the honest outcome.
+ */
+export async function fetchCertificateIndex(
+  net: import("../net/client").NetClient,
+  domain: string
+): Promise<import("../net/client").FetchResult<unknown>> {
+  const key = `certspotter:${domain}`;
+  const first = await net.json<unknown>(certificateIndexUrl(domain), {
+    timeoutMs: 30_000,
+    cacheKey: key,
+  });
+  if (first.ok) return first;
+
+  // Only a gateway timeout is worth retrying. A 403 or a rate limit means the
+  // query will not succeed in a second, and retrying would just burn the budget.
+  const isWarmupTimeout =
+    first.status === 504 || /timeout/i.test(first.message ?? "");
+  if (!isWarmupTimeout) return first;
+
+  await new Promise((resolve) => setTimeout(resolve, 4_000));
+  // The retry needs a different cache key. The fetch layer caches by key, not by
+  // URL, so re-requesting with the same key hands back the cached 504 and the
+  // retry can never succeed. `forget` also cannot help here: it matches keys
+  // that contain the URL, and this key is `certspotter:<domain>`.
+  return net.json<unknown>(certificateIndexUrl(domain), {
+    timeoutMs: 30_000,
+    cacheKey: `${key}:retry`,
+  });
+}
+
+/**
+ * Labels that suggest a host was never meant to be reachable from the internet.
+ *
+ * Matching is by whole label, not by substring. A substring test read `s1`
+ * inside a DKIM selector and `dev` inside an unrelated word as "internal", which
+ * raised a finding and a failing status for a domain whose only sin was having a
+ * certificate for a host with a short name. `dev.example.com` is a signal;
+ * `s1.example.com` is not.
+ */
+const INTERNAL_LABELS = new Set([
+  "dev",
+  "staging",
+  "stage",
+  "test",
+  "uat",
+  "qa",
+  "internal",
+  "intranet",
+  "admin",
+  "jenkins",
+  "gitlab",
+  "grafana",
+  "kibana",
+  "vpn",
+  "phpmyadmin",
+  "jira",
+  "confluence",
+  "ldap",
+  "sso",
+  "corp",
+]);
+
+/** True when any label of a hostname equals an internal term exactly. */
+export function looksInternal(host: string): boolean {
+  return host
+    .split(".")
+    .some((label) => label.split("-").some((part) => INTERNAL_LABELS.has(part)));
 }
 
 export const ctLogs: CheckDefinition = {
@@ -116,17 +211,8 @@ export const ctLogs: CheckDefinition = {
   async run(ctx): Promise<CheckResult> {
     const started = performance.now();
     const domain = ctx.target.domain;
-    const url = `https://crt.sh/?q=${encodeURIComponent(domain)}&output=json`;
 
-    // crt.sh is a single-instance database with no CDN in front of it. A cold
-    // query for a busy domain routinely takes 20 to 30 seconds, and a timeout
-    // here costs the whole check, so the ceiling is generous and the call
-    // retries once.
-    const res = await ctx.net.text(url, {
-      timeoutMs: 45_000,
-      retry: true,
-      cacheKey: `crtsh:${domain}`,
-    });
+    const res = await fetchCertificateIndex(ctx.net, domain);
 
     if (!res.ok) {
       return {
@@ -134,45 +220,59 @@ export const ctLogs: CheckDefinition = {
         title: this.title,
         question: this.question,
         status: "unavailable",
-        headline: describeFailure(res, "The CT log index"),
+        headline: describeFailure(res, "The certificate index"),
         findings: [],
         ms: Math.round(performance.now() - started),
-        source: "crt.sh",
-        note: "crt.sh is occasionally slow under load. Re-running the scan usually succeeds.",
+        source: "Cert Spotter certificate index",
+        note: "The certificate index did not answer, so no claim is made about which certificates exist. This is not evidence that none do.",
       };
     }
 
-    let entries: CtEntry[];
-    try {
-      entries = JSON.parse(res.text) as CtEntry[];
-    } catch {
-      // crt.sh answers an unparseable body under load, and sometimes an HTML
-      // error page with a 200. Reporting that as "no certificates exist" would
-      // state a fact about the domain from a response that said nothing about
-      // it, so the check declines to answer instead.
+    if (!Array.isArray(res.json)) {
+      // The endpoint answers an error object rather than a list when a domain
+      // is outside its free tier or a query is malformed. Reading that as "no
+      // certificates exist" would state a fact from a response that carried no
+      // certificate data.
       return {
         id: this.id,
         title: this.title,
         question: this.question,
         status: "unavailable",
-        headline: "The CT log index returned a response that could not be read as JSON.",
+        headline: "The certificate index returned a response that was not a list of issuances.",
         findings: [],
         ms: Math.round(performance.now() - started),
-        source: "crt.sh",
-        note: "crt.sh is occasionally slow under load and answers with an error page. This is not evidence that no certificates exist for the domain.",
+        source: "Cert Spotter certificate index",
+        note: "The response named an error rather than listing certificates. This is not evidence that no certificates exist for the domain.",
       };
     }
 
-    if (!Array.isArray(entries) || entries.length === 0) {
+    const entries = res.json as CertSpotterIssuance[];
+
+    if (entries.length === 0) {
+      // The index lists unexpired issuances only, so an empty list is a real
+      // answer about the last 100 results, but it is not "no certificate was
+      // ever issued". The wording separates the two.
       return {
         id: this.id,
         title: this.title,
         question: this.question,
         status: "info",
-        headline: "No certificates were found in public CT logs for this domain.",
+        headline: `Cert Spotter lists no unexpired issuance for ${domain}.`,
         findings: [],
+        data: {
+          certificates: 0,
+          issuers: [],
+          hostnames: [],
+          notableHosts: [],
+          newest: null,
+          oldest: null,
+          longestValidityDays: 0,
+          wildcards: [],
+          truncated: false,
+        } satisfies CtData,
         ms: Math.round(performance.now() - started),
-        source: "crt.sh",
+        source: "Cert Spotter certificate index",
+        note: "Cert Spotter lists unexpired issuances from public certificate transparency logs. An empty list means the index holds no live certificate for the name, which can mean none was ever logged or that every one logged has expired. It is not a verdict that the site has no certificate.",
       };
     }
 
@@ -180,39 +280,45 @@ export const ctLogs: CheckDefinition = {
     const hostSet = new Set<string>();
     let newest: string | null = null;
     let oldest: string | null = null;
-    /**
-     * The longest-lived certificate issued on or after the 398-day cap took
-     * effect, with its dates. Tracking only the global maximum missed the real
-     * defect: a 2015 ten-year certificate outranked a 500-day certificate from
-     * last year, so the one that actually violates the cap was never cited.
-     * Only entries whose issuer looks like a real CA are eligible, because a
-     * test intermediate with a ten-year validity is not a certificate the site
-     * serves and must not stand in for one.
-     */
-    const CUTOFF = Date.UTC(2020, 8, 1);
     let longestSinceCutoff = 0;
-    let longestSinceCutoffEntry: CtEntry | null = null;
+    let longestSinceCutoffEntry: CertSpotterIssuance | null = null;
+
+    const CUTOFF = Date.UTC(2020, 8, 1);
+
+    // A suffix test alone would accept a lookalike such as notexample.com for
+    // example.com, so a name counts only at the apex or past a dot boundary.
+    const inDomain = (host: string): boolean => host === domain || host.endsWith("." + domain);
 
     for (const e of entries) {
-      const label = caLabel(e.issuer_name);
+      const label = caLabel(e.issuer);
       issuerCounts.set(label, (issuerCounts.get(label) ?? 0) + 1);
-      for (const name of (e.name_value || "").split("\n")) {
-        const n = name.trim().toLowerCase();
-        if (n) hostSet.add(n);
+
+      for (const name of e.dns_names ?? []) {
+        const n = String(name).trim().toLowerCase().replace(/\.$/, "");
+        if (!n) continue;
+        // A certificate can carry names outside this domain: example.com's
+        // certificate also covers example.edu and example.net. Those names are
+        // not part of this site's surface, and counting them inflated the
+        // hostname total with unrelated registrations.
+        const bare = n.startsWith("*.") ? n.slice(2) : n;
+        if (inDomain(bare)) hostSet.add(n);
       }
-      const issuedAt = issuanceTime(e);
-      if (!Number.isNaN(issuedAt)) {
-        const iso = new Date(issuedAt).toISOString();
+
+      const notBefore = e.not_before ?? "";
+      const notAfter = e.not_after ?? "";
+      const issued = notBefore ? Date.parse(notBefore) : NaN;
+      if (!Number.isNaN(issued)) {
+        const iso = new Date(issued).toISOString();
         if (!newest || iso > newest) newest = iso;
         if (!oldest || iso < oldest) oldest = iso;
       }
-      const v = validityDays(e.not_before, e.not_after);
-      const issued = e.not_before ? Date.parse(e.not_before) : NaN;
+
+      const v = validityDays(notBefore, notAfter);
       if (
         v > longestSinceCutoff &&
         !Number.isNaN(issued) &&
         issued >= CUTOFF &&
-        isRealIssuer(e.issuer_name)
+        isRealIssuer(label)
       ) {
         longestSinceCutoff = v;
         longestSinceCutoffEntry = e;
@@ -252,31 +358,45 @@ export const ctLogs: CheckDefinition = {
     // report, so this check keeps the data and stays quiet about it.
 
     const apex = domain;
-    const inDomain = hostnames.filter(
-      (h) => !h.startsWith("*.") && h !== apex && h.endsWith(apex)
+    const inDomainHosts = hostnames.filter(
+      (h) => !h.startsWith("*.") && h !== apex && h.endsWith("." + apex)
     );
 
+    // The endpoint returns at most 100 issuances per page and the browser cannot
+    // read its Link header, so a full page is a floor. Every count in the
+    // headline and data is then a minimum, and both say so.
+    const truncated = entries.length >= 100;
+
     const status: CheckResult["status"] = findings.length > 0 ? "warn" : "info";
+
+    const headline =
+      truncated
+        ? `At least ${entries.length} unexpired certificate${entries.length === 1 ? "" : "s"} from ${issuers.length} issuer${issuers.length === 1 ? "" : "s"}, covering at least ${hostnames.length} distinct hostname${hostnames.length === 1 ? "" : "s"}. More exist than this page lists.`
+        : `${entries.length} unexpired certificate${entries.length === 1 ? "" : "s"} from ${issuers.length} issuer${issuers.length === 1 ? "" : "s"}, covering ${hostnames.length} distinct hostname${hostnames.length === 1 ? "" : "s"}.`;
 
     return {
       id: this.id,
       title: this.title,
       question: this.question,
       status,
-      headline: `${entries.length} certificates from ${issuers.length} issuer${issuers.length === 1 ? "" : "s"}, covering ${hostnames.length} distinct hostname${hostnames.length === 1 ? "" : "s"}.`,
+      headline,
       findings,
       data: {
         certificates: entries.length,
         issuers,
         hostnames,
-        notableHosts: inDomain.slice(0, 40),
+        notableHosts: inDomainHosts.slice(0, 40),
         newest,
         oldest,
         longestValidityDays: longestSinceCutoff,
         wildcards,
+        truncated,
       } satisfies CtData,
       ms: Math.round(performance.now() - started),
-      source: "crt.sh Certificate Transparency index",
+      source: "Cert Spotter certificate index (public certificate transparency logs)",
+      note: truncated
+        ? "Cert Spotter lists unexpired issuances from public certificate transparency logs, at most 100 per page. This page was full and the browser cannot follow its pagination header, so every count here is a floor and more issuances may exist."
+        : "Cert Spotter lists unexpired issuances from public certificate transparency logs, with the issuer each certificate named. It is an index of what was logged, so a certificate logged after the query is not reflected here, and a certificate that has expired is not returned at all.",
     };
   },
 };

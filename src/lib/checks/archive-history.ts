@@ -93,6 +93,20 @@ async function closestCapture(
     return { iso: null, replayUrl: null, status: null, ok: false };
   }
 
+  // The generic on `net.json` is a promise the caller makes, not a runtime
+  // check. A body that parses as JSON but is an array or a string would pass
+  // the `!res.json` test above and then read `archived_snapshots` as undefined,
+  // which the branch below would call "no capture at the archive". That is a
+  // fact about a site drawn from a body that said nothing about it, so a body
+  // that is not an object with an `archived_snapshots` field is a failed query.
+  const body: unknown = res.json;
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return { iso: null, replayUrl: null, status: null, ok: false };
+  }
+  if (!("archived_snapshots" in body)) {
+    return { iso: null, replayUrl: null, status: null, ok: false };
+  }
+
   // A 200 carrying an error object is still a query that did not answer. The
   // endpoint's 5-second client timeout arrives this way, and reading it as an
   // empty archive is what turns a failed request into a false statement.
@@ -105,8 +119,17 @@ async function closestCapture(
     return { iso: null, replayUrl: null, status: null, ok: true };
   }
 
+  const iso = tsToIso(closest.timestamp);
+  if (!iso) {
+    // The endpoint said a capture is available but did not give a timestamp
+    // this code can read. Reporting no capture would contradict what it said,
+    // and reporting a date would invent one, so the query is treated as
+    // unanswered rather than guessed in either direction.
+    return { iso: null, replayUrl: closest.url ?? null, status: null, ok: false };
+  }
+
   return {
-    iso: tsToIso(closest.timestamp),
+    iso,
     replayUrl: closest.url ?? null,
     status: closest.status ?? null,
     ok: true,
@@ -195,13 +218,15 @@ export const archiveHistory: CheckDefinition = {
     // The earliest query did not answer. The latest one may still have, and
     // that half is reported, but the headline may not extend to the half that
     // did not answer: "no earlier capture" would be a conclusion drawn from a
-    // request that failed. A partial answer is information, not a verdict.
+    // request that failed. A partially answered check is unavailable, not
+    // information: it cannot answer the question it asked, and scoring it as a
+    // near-clean result would hide that half the record was never read.
     if (firstFailed) {
       return {
         id: this.id,
         title: this.title,
         question: this.question,
-        status: "info",
+        status: "unavailable",
         headline: lastCapture
           ? `The most recent capture is on ${lastCapture.slice(0, 10)}, but the earliest capture could not be determined because the archive did not answer that query.`
           : `The archive reported no capture at the present, and the query for the earliest capture did not answer, so the start of the record is unknown.`,
@@ -227,7 +252,7 @@ export const archiveHistory: CheckDefinition = {
         id: this.id,
         title: this.title,
         question: this.question,
-        status: "info",
+        status: "unavailable",
         headline: firstCapture
           ? `The earliest capture is on ${firstCapture.slice(0, 10)}, but the most recent capture could not be determined because the archive did not answer that query.`
           : `The archive reported no capture at the start of the web, and the query for the most recent capture did not answer, so the end of the record is unknown.`,

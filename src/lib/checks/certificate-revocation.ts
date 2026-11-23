@@ -20,6 +20,7 @@
 
 import type { CheckDefinition, CheckResult, Finding } from "../types";
 import { describeFailure } from "../net/client";
+import { fetchCertificateIndex } from "./ct-logs";
 
 type CertSpotterIssuer = {
   name?: string;
@@ -104,18 +105,13 @@ export const certificateRevocation: CheckDefinition = {
   async run(ctx): Promise<CheckResult> {
     const started = performance.now();
     const domain = ctx.target.domain;
-    const url =
-      `https://api.certspotter.com/v1/issuances?domain=${encodeURIComponent(domain)}` +
-      "&include_subdomains=false&expand=dns_names&expand=issuer&expand=cert";
 
-    // The service allows 100 requests an hour per IP without a key, which is
-    // ample for a scan, so a retry is not worth the extra wait. The timeout is
-    // generous because a busy domain returns a large body: every issuance here
-    // carries its DER certificate.
-    const res = await ctx.net.json<CertSpotterEntry[]>(url, {
-      timeoutMs: 25_000,
-      cacheKey: `certspotter:${domain}`,
-    });
+    // The shared fetch, not a bare call: Cert Spotter answers a cold query for a
+    // large domain with a 504 while it warms its cache, and that response is not
+    // a verdict about the domain. Uncertainty about revocation is not something
+    // to spend on a warmup, so this uses the same delayed retry as the other
+    // certificate checks.
+    const res = await fetchCertificateIndex(ctx.net, domain);
 
     if (!res.ok) {
       return {
@@ -148,7 +144,7 @@ export const certificateRevocation: CheckDefinition = {
       };
     }
 
-    const entries = res.json;
+    const entries = res.json as CertSpotterEntry[];
 
     // The service paginates at 100 and advertises the next page in a Link
     // header that it does not expose to browsers, so the Link check only fires

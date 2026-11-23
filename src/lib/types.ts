@@ -99,7 +99,17 @@ export type CheckGroup =
   | "recon";
 
 /** The reference categories a dork belongs to, used by the dork catalogue page. */
-export type DorkCategory = "exposure" | "login" | "error" | "content" | "infra" | "leaks";
+export type DorkCategory =
+  | "exposure"
+  | "login"
+  | "error"
+  | "content"
+  | "infra"
+  | "leaks"
+  | "cloud"
+  | "api"
+  | "code"
+  | "docs";
 
 /**
  * How Ocellus relates to a third-party scanner: it answers the same question in
