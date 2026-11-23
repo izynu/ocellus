@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <rect width="1200" height="630" fill="#080c10"/>
+  <circle cx="120" cy="-40" r="420" fill="#38d2b6" opacity="0.10"/>
+  <circle cx="1120" cy="180" r="380" fill="#6aa9d8" opacity="0.07"/>
+
+  <g transform="translate(84,92)">
+    <circle cx="26" cy="26" r="24" fill="none" stroke="#38d2b6" stroke-opacity="0.32" stroke-width="3.4"/>
+    <circle cx="26" cy="26" r="15" fill="none" stroke="#38d2b6" stroke-width="3.4"/>
+    <circle cx="26" cy="26" r="6.2" fill="#38d2b6"/>
+    <text x="70" y="38" font-family="Inter, system-ui, -apple-system, Segoe UI, sans-serif" font-size="34" font-weight="600" fill="#e8eef3" letter-spacing="-0.4">Ocellus</text>
+  </g>
+
+  <text x="84" y="250" font-family="Inter, system-ui, -apple-system, Segoe UI, sans-serif" font-size="58" font-weight="620" fill="#e8eef3" letter-spacing="-1.2">A website audit that shows</text>
+  <text x="84" y="320" font-family="Inter, system-ui, -apple-system, Segoe UI, sans-serif" font-size="58" font-weight="620" fill="#38d2b6" letter-spacing="-1.2">its sources and its gaps.</text>
+
+  <text x="84" y="386" font-family="Inter, system-ui, -apple-system, Segoe UI, sans-serif" font-size="25" fill="#8d9dab">32 checks run in your browser against public sources. No account, no key,</text>
+  <text x="84" y="422" font-family="Inter, system-ui, -apple-system, Segoe UI, sans-serif" font-size="25" fill="#8d9dab">and an explicit gap wherever a source could not be reached.</text>
+
+  <g font-family="Inter, system-ui, -apple-system, Segoe UI, sans-serif" font-size="18" fill="#8d9dab">
+    <rect x="84" y="486" width="196" height="38" rx="8" fill="#111920" stroke="#1c2730"/>
+    <text x="102" y="511">DNS and DNSSEC</text>
+    <rect x="292" y="486" width="226" height="38" rx="8" fill="#111920" stroke="#1c2730"/>
+    <text x="310" y="511">Headers and TLS</text>
+    <rect x="530" y="486" width="204" height="38" rx="8" fill="#111920" stroke="#1c2730"/>
+    <text x="548" y="511">Email policy</text>
+    <rect x="746" y="486" width="232" height="38" rx="8" fill="#111920" stroke="#1c2730"/>
+    <text x="764" y="511">Exposure and ports</text>
+    <rect x="990" y="486" width="126" height="38" rx="8" fill="#111920" stroke="#1c2730"/>
+    <text x="1008" y="511">Reputation</text>
+  </g>
+
+  <line x1="84" y1="562" x2="1116" y2="562" stroke="#1c2730" stroke-width="1"/>
+  <text x="84" y="596" font-family="Inter, system-ui, -apple-system, Segoe UI, sans-serif" font-size="20" fill="#7c8b98">izynu.github.io/ocellus</text>
+  <text x="1116" y="596" text-anchor="end" font-family="Inter, system-ui, -apple-system, Segoe UI, sans-serif" font-size="20" fill="#7c8b98">Runs in the browser</text>
+</svg>

@@ -1,114 +1,152 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 300" width="1200" height="300" role="img" preserveAspectRatio="xMidYMid meet" aria-label="A scan runs in three stages. Your browser asks public sources. The checks resolve one at a time, each landing as its source answers. The report shows what passed, what warned, what failed and what could not run, and nothing that could not run is counted as a pass.">
-  <title>How a scan runs: sources, checks, report</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 300" width="1200" height="300" role="img" preserveAspectRatio="xMidYMid meet" aria-label="A four stage scan flow, left to right: your browser sends requests; CORS-open public sources answer; 32 fixed checks resolve one at a time; a categorised report marks each check pass, warn, fail or unavailable. Small dots travel along the connector lines to show the direction of data flow.">
+  <title>How a scan runs: browser, sources, checks, report</title>
 
-  <rect width="1200" height="300" fill="#0b0e13"/>
-  <rect x="0.5" y="0.5" width="1199" height="299" fill="none" stroke="#232b36"/>
+  <style>
+    /* One dot travelling each connector. A short dash on a long gap, with the
+       offset animated, reads as a single dot moving rather than a marching
+       dash. */
+    .flow {
+      stroke-dasharray: 5 55;
+      animation: travel 2.6s linear infinite;
+    }
+    .flow-b { animation-delay: 0.65s; }
+    .flow-c { animation-delay: 1.3s; }
+    @keyframes travel {
+      from { stroke-dashoffset: 60; }
+      to   { stroke-dashoffset: 0; }
+    }
+    .arrow { animation: arrow-glow 2.6s ease-in-out infinite; }
+    @keyframes arrow-glow {
+      0%, 100% { opacity: 0.45; }
+      50%      { opacity: 0.9; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .flow { animation: none; stroke-dasharray: none; stroke-opacity: 0.55; }
+      .arrow { animation: none; opacity: 0.7; }
+    }
+  </style>
 
-  <!-- Stage labels across the top. -->
-  <g font-family="Inter, ui-sans-serif, system-ui, sans-serif">
-    <text x="40" y="40" fill="#5a6676" font-size="12" letter-spacing="1.6">01  SOURCES</text>
-    <text x="430" y="40" fill="#5a6676" font-size="12" letter-spacing="1.6">02  CHECKS</text>
-    <text x="820" y="40" fill="#5a6676" font-size="12" letter-spacing="1.6">03  REPORT</text>
+  <defs>
+    <linearGradient id="pipe-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#080c10"/>
+      <stop offset="1" stop-color="#101820"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="300" fill="url(#pipe-bg)"/>
+  <rect x="0.5" y="0.5" width="1199" height="299" fill="none" stroke="#1c2730"/>
+
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" fill="#5c6879" font-size="12" letter-spacing="1.5">
+    <text x="32" y="34">01  REQUEST</text>
+    <text x="332" y="34">02  SOURCES</text>
+    <text x="632" y="34">03  CHECKS</text>
+    <text x="932" y="34">04  REPORT</text>
   </g>
 
-  <!--   Stage 1: your browser asks public sources   -->
-  <g transform="translate(40 62)" font-family="Inter, ui-sans-serif, system-ui, sans-serif">
-    <rect x="0" y="0" width="330" height="196" rx="12" fill="#10151c" stroke="#232b36"/>
-    <text x="18" y="28" fill="#e8ecf2" font-size="15" font-weight="600">Your browser</text>
-    <text x="18" y="48" fill="#94a1b2" font-size="12">Queries each source directly.</text>
-
-    <!-- Three source chips, named for what they answer. -->
+  <!-- Stage 1 -->
+  <g transform="translate(32 58)" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+    <rect width="248" height="196" rx="12" fill="#10151c" stroke="#1c2730"/>
+    <text x="18" y="30" fill="#e8ecf2" font-size="16" font-weight="600">Your browser</text>
+    <text x="18" y="52" fill="#94a1b2" font-size="12">Types a hostname, starts a scan.</text>
     <g font-size="12">
-      <rect x="18" y="64" width="138" height="30" rx="7" fill="#0b0e13" stroke="#232b36"/>
-      <text x="30" y="84" fill="#c8d2df">DNS over HTTPS</text>
-
-      <rect x="174" y="64" width="138" height="30" rx="7" fill="#0b0e13" stroke="#232b36"/>
-      <text x="186" y="84" fill="#c8d2df">CT logs</text>
-
-      <rect x="18" y="102" width="138" height="30" rx="7" fill="#0b0e13" stroke="#232b36"/>
-      <text x="30" y="122" fill="#c8d2df">Response headers</text>
-
-      <rect x="174" y="102" width="138" height="30" rx="7" fill="#0b0e13" stroke="#232b36"/>
-      <text x="186" y="122" fill="#c8d2df">The page</text>
-
-      <rect x="18" y="140" width="138" height="30" rx="7" fill="#0b0e13" stroke="#232b36"/>
-      <text x="30" y="160" fill="#c8d2df">Reputation feeds</text>
-
-      <rect x="174" y="140" width="138" height="30" rx="7" fill="#0b0e13" stroke="#232b36"/>
-      <text x="186" y="160" fill="#c8d2df">Passive DNS</text>
+      <rect x="18" y="70" width="212" height="30" rx="7" fill="#080c10" stroke="#1c2730"/>
+      <text x="30" y="90" fill="#c8d2df">No install, no account</text>
+      <rect x="18" y="108" width="212" height="30" rx="7" fill="#080c10" stroke="#1c2730"/>
+      <text x="30" y="128" fill="#c8d2df">No API key held</text>
+      <rect x="18" y="146" width="212" height="30" rx="7" fill="#080c10" stroke="#1c2730"/>
+      <text x="30" y="166" fill="#c8d2df">Requests leave the tab</text>
     </g>
-    <text x="18" y="186" fill="#5a6676" font-size="11">CORS is required. No key is used.</text>
+    <text x="18" y="188" fill="#5c6879" font-size="11">Nothing is uploaded to a server.</text>
   </g>
 
-  <!-- Arrow 1 -->
-  <g stroke="#4fd1c5" stroke-width="1.5" fill="none" opacity="0.75">
-    <path d="M378 160 H412"/>
-    <path d="M404 154 L412 160 L404 166"/>
+  <!-- Connector 1 -->
+  <g stroke="#38d2b6" stroke-width="1.5" fill="none">
+    <path class="arrow" d="M292 156 H320"/>
+    <path class="arrow" d="M312 150 L320 156 L312 162"/>
+    <path class="flow" d="M292 156 H320"/>
   </g>
 
-  <!--   Stage 2: checks resolve one at a time   -->
-  <g transform="translate(420 62)" font-family="Inter, ui-sans-serif, system-ui, sans-serif">
-    <rect x="0" y="0" width="330" height="196" rx="12" fill="#10151c" stroke="#232b36"/>
-    <text x="18" y="28" fill="#e8ecf2" font-size="15" font-weight="600">Checks resolve</text>
-    <text x="18" y="48" fill="#94a1b2" font-size="12">One at a time, as each source answers.</text>
+  <!-- Stage 2 -->
+  <g transform="translate(332 58)" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+    <rect width="248" height="196" rx="12" fill="#10151c" stroke="#1c2730"/>
+    <text x="18" y="30" fill="#e8ecf2" font-size="16" font-weight="600">CORS-open sources</text>
+    <text x="18" y="52" fill="#94a1b2" font-size="12">Public APIs answer your tab.</text>
+    <g font-size="12">
+      <rect x="18" y="70" width="212" height="30" rx="7" fill="#080c10" stroke="#1c2730"/>
+      <text x="30" y="90" fill="#c8d2df">DNS over HTTPS, CT logs</text>
+      <rect x="18" y="108" width="212" height="30" rx="7" fill="#080c10" stroke="#1c2730"/>
+      <text x="30" y="128" fill="#c8d2df">Response headers, the page</text>
+      <rect x="18" y="146" width="212" height="30" rx="7" fill="#080c10" stroke="#1c2730"/>
+      <text x="30" y="166" fill="#c8d2df">Reputation and passive DNS</text>
+    </g>
+    <text x="18" y="188" fill="#5c6879" font-size="11">120 catalogued; 26 reachable in a page.</text>
+  </g>
 
-    <!-- Four check rows, each with a status dot. -->
+  <!-- Connector 2 -->
+  <g stroke="#38d2b6" stroke-width="1.5" fill="none">
+    <path class="arrow" d="M592 156 H620"/>
+    <path class="arrow" d="M612 150 L620 156 L612 162"/>
+    <path class="flow flow-b" d="M592 156 H620"/>
+  </g>
+
+  <!-- Stage 3 -->
+  <g transform="translate(632 58)" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+    <rect width="248" height="196" rx="12" fill="#10151c" stroke="#1c2730"/>
+    <text x="18" y="30" fill="#e8ecf2" font-size="16" font-weight="600">32 checks</text>
+    <text x="18" y="52" fill="#94a1b2" font-size="12">One question each, one at a time.</text>
     <g font-size="12.5">
-      <circle cx="26" cy="74" r="4.5" fill="#56c98a"/>
-      <text x="40" y="79" fill="#c8d2df">DNS records</text>
-      <text x="288" y="79" fill="#56c98a" text-anchor="end" font-size="11">pass</text>
+      <circle cx="27" cy="78" r="4.5" fill="#56c98a"/>
+      <text x="42" y="83" fill="#c8d2df">DNS records</text>
+      <text x="228" y="83" fill="#56c98a" text-anchor="end" font-size="11">pass</text>
 
-      <circle cx="26" cy="104" r="4.5" fill="#56c98a"/>
-      <text x="40" y="109" fill="#c8d2df">Certificates</text>
-      <text x="288" y="109" fill="#56c98a" text-anchor="end" font-size="11">pass</text>
+      <circle cx="27" cy="108" r="4.5" fill="#56c98a"/>
+      <text x="42" y="113" fill="#c8d2df">Certificate transparency</text>
+      <text x="228" y="113" fill="#56c98a" text-anchor="end" font-size="11">pass</text>
 
-      <circle cx="26" cy="134" r="4.5" fill="#e0a33a"/>
-      <text x="40" y="139" fill="#c8d2df">Security headers</text>
-      <text x="288" y="139" fill="#e0a33a" text-anchor="end" font-size="11">warn</text>
+      <circle cx="27" cy="138" r="4.5" fill="#e0a33a"/>
+      <text x="42" y="143" fill="#c8d2df">HTTP security headers</text>
+      <text x="228" y="143" fill="#e0a33a" text-anchor="end" font-size="11">warn</text>
 
-      <circle cx="26" cy="164" r="4.5" fill="#7b8798"/>
-      <text x="40" y="169" fill="#c8d2df">Popularity rank</text>
-      <text x="288" y="169" fill="#7b8798" text-anchor="end" font-size="11">unavailable</text>
+      <circle cx="27" cy="168" r="4.5" fill="#7b8798"/>
+      <text x="42" y="173" fill="#c8d2df">Popularity rank</text>
+      <text x="228" y="173" fill="#7b8798" text-anchor="end" font-size="11">unavailable</text>
     </g>
   </g>
 
-  <!-- Arrow 2 -->
-  <g stroke="#4fd1c5" stroke-width="1.5" fill="none" opacity="0.75">
-    <path d="M758 160 H792"/>
-    <path d="M784 154 L792 160 L784 166"/>
+  <!-- Connector 3 -->
+  <g stroke="#38d2b6" stroke-width="1.5" fill="none">
+    <path class="arrow" d="M892 156 H920"/>
+    <path class="arrow" d="M912 150 L920 156 L912 162"/>
+    <path class="flow flow-c" d="M892 156 H920"/>
   </g>
 
-  <!--   Stage 3: the report   -->
-  <g transform="translate(810 62)" font-family="Inter, ui-sans-serif, system-ui, sans-serif">
-    <rect x="0" y="0" width="350" height="196" rx="12" fill="#10151c" stroke="#232b36"/>
-    <text x="18" y="28" fill="#e8ecf2" font-size="15" font-weight="600">The report</text>
-    <text x="18" y="48" fill="#94a1b2" font-size="12">Measured, separated from missing.</text>
-
-    <!-- Four status columns with a count each. The counts are illustrative of a
-         shape, not a claim about any site: the note below says so. -->
+  <!-- Stage 4 -->
+  <g transform="translate(932 58)" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+    <rect width="236" height="196" rx="12" fill="#10151c" stroke="#1c2730"/>
+    <text x="18" y="30" fill="#e8ecf2" font-size="16" font-weight="600">Categorised report</text>
+    <text x="18" y="52" fill="#94a1b2" font-size="12">Grouped, scored, exportable.</text>
     <g font-size="11">
-      <rect x="18" y="66" width="74" height="76" rx="8" fill="#0b0e13" stroke="#232b36"/>
-      <circle cx="34" cy="84" r="4" fill="#56c98a"/>
-      <text x="46" y="88" fill="#94a1b2">pass</text>
-      <text x="34" y="126" fill="#56c98a" font-size="24" font-weight="600">21</text>
+      <rect x="18" y="70" width="94" height="52" rx="8" fill="#080c10" stroke="#1c2730"/>
+      <circle cx="32" cy="86" r="4" fill="#56c98a"/>
+      <text x="44" y="90" fill="#94a1b2">pass</text>
+      <text x="30" y="112" fill="#c8d2df" font-size="15" font-weight="600">weight 1.00</text>
 
-      <rect x="100" y="66" width="74" height="76" rx="8" fill="#0b0e13" stroke="#232b36"/>
-      <circle cx="116" cy="84" r="4" fill="#e0a33a"/>
-      <text x="128" y="88" fill="#94a1b2">warn</text>
-      <text x="116" y="126" fill="#e0a33a" font-size="24" font-weight="600">5</text>
+      <rect x="122" y="70" width="94" height="52" rx="8" fill="#080c10" stroke="#1c2730"/>
+      <circle cx="136" cy="86" r="4" fill="#e0a33a"/>
+      <text x="148" y="90" fill="#94a1b2">warn</text>
+      <text x="134" y="112" fill="#c8d2df" font-size="15" font-weight="600">weight 0.55</text>
 
-      <rect x="182" y="66" width="74" height="76" rx="8" fill="#0b0e13" stroke="#232b36"/>
-      <circle cx="198" cy="84" r="4" fill="#ef6a72"/>
-      <text x="210" y="88" fill="#94a1b2">fail</text>
-      <text x="198" y="126" fill="#ef6a72" font-size="24" font-weight="600">2</text>
+      <rect x="18" y="130" width="94" height="52" rx="8" fill="#080c10" stroke="#1c2730"/>
+      <circle cx="32" cy="146" r="4" fill="#ef6a72"/>
+      <text x="44" y="150" fill="#94a1b2">fail</text>
+      <text x="30" y="172" fill="#c8d2df" font-size="15" font-weight="600">weight 0.10</text>
 
-      <rect x="264" y="66" width="68" height="76" rx="8" fill="#0b0e13" stroke="#232b36"/>
-      <circle cx="280" cy="84" r="4" fill="#7b8798"/>
-      <text x="292" y="88" fill="#94a1b2">n/a</text>
-      <text x="280" y="126" fill="#7b8798" font-size="24" font-weight="600">4</text>
+      <rect x="122" y="130" width="94" height="52" rx="8" fill="#080c10" stroke="#1c2730"/>
+      <circle cx="136" cy="146" r="4" fill="#7b8798"/>
+      <text x="148" y="150" fill="#94a1b2">unavailable</text>
+      <text x="134" y="172" fill="#c8d2df" font-size="15" font-weight="600">removed</text>
     </g>
-
-    <text x="18" y="166" fill="#94a1b2" font-size="12">The score covers the checks that ran.</text>
-    <text x="18" y="184" fill="#5a6676" font-size="11">An unavailable check is never counted as a pass.</text>
   </g>
+
+  <text x="32" y="284" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" fill="#5c6879" font-size="12">A check that could not run is removed from the score, never counted as a pass. A partial scan is reported as partial.</text>
 </svg>

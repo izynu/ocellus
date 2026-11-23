@@ -2,14 +2,20 @@
  * Print and PDF styling for the Ocellus report.
  *
  * The screen report is built from boxes, glass and disclosure controls, which
- * are the right tools on a screen and the wrong ones on paper. So print does not
- * restyle the screen report: it hides it and shows a separate, paper-first
+ * are the right tools on a screen and the wrong ones on paper. So print does
+ * not restyle the screen report: it hides it and shows a separate, paper-first
  * document rendered by `PrintReport`. This file only decides which of the two
- * exists in each medium and how the printed one lays out.
+ * exists in each medium, and how the printed one lays out.
  *
- * Colour is kept, because a status rail is the fastest way to find a failure in
- * a printed appendix, but it is confined to a 3px left border on each row so it
- * survives greyscale. Everything else is black on white.
+ * Everything here is in points, which is the unit a page actually uses. Body
+ * copy is 10pt on a 1.45 line height, which is a printed memo rather than a
+ * screenshot of a browser. Status is never carried by colour alone: each check
+ * and finding has a 3pt left border, a spelled-out status word, and a table row
+ * label, so the sheet still reads in greyscale or from a photocopier.
+ *
+ * Colour is kept where it is meaning, because a status rail is the fastest way
+ * to find a failure in a printed appendix, but it is confined to the 3pt left
+ * border and the status word. Everything else is black on white.
  */
 
 /* ------------------------------------------------------------------ screen -- */
@@ -29,11 +35,11 @@
 
 @page {
   size: A4;
-  margin: 16mm 14mm;
+  margin: 14mm 13mm;
 }
 
 @media print {
-  /* Keep status colour where it is used, and drop it everywhere it is not. */
+  /* Keep status colour where it is used, and drop motion and shadow everywhere. */
   *,
   *::before,
   *::after {
@@ -50,40 +56,39 @@
   /*
    * The white-paper reset applies only to a page that actually carries a print
    * document. Applying it sitewide made every other page print white text on
-   * white, because the screen theme is dark; those pages now print as they
-   * look, which is legible, and the scan report gets its own sheet.
+   * white, because the screen theme is dark; those pages print as they look,
+   * which is legible, and the scan report gets its own sheet.
    */
   body:has(.print-doc) {
     background: #ffffff !important;
     color: #111111 !important;
-    font-size: 10.5pt;
+    font-size: 10pt;
     line-height: 1.45;
   }
 
-  /* Nothing but the report goes on the sheet. The site chrome is removed, but
-     only outside the print document: it uses its own <header> and <footer> for
-     the cover and the provenance block, and those must survive. */
+  /* Site chrome and interaction have no place on the sheet. Scoped to the
+     page shell so the print document's own header and footer survive. */
   .scene,
   .skip-link,
   form,
   .btn,
+  .scan-summary,
   main > .container-page > h1,
-  /* The scan page's one-line summary under the form. Scoped to the scan
-     workspace so it cannot hide a tabular paragraph on any other page. */
-  .scan-summary {
+  body > header,
+  body > footer {
     display: none !important;
   }
 
+  .print-doc,
   .print-doc header,
   .print-doc footer {
     display: block !important;
   }
 
-  body > header,
-  body > footer,
-  .print-doc ~ header,
-  .print-doc ~ footer {
-    display: none !important;
+  /* The cover is a column, so the contents list can sit at the foot of the
+     page. It has to win against the header rule above. */
+  .print-doc .print-cover {
+    display: flex !important;
   }
 
   .container-page {
@@ -103,8 +108,11 @@
   }
 
   .print-doc {
-    display: block !important;
     color: #111111;
+    font-family: var(--font-sans), ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+    font-size: 10pt;
+    line-height: 1.45;
+    font-variant-numeric: tabular-nums;
   }
 
   /* --- typography --- */
@@ -117,32 +125,37 @@
     break-after: avoid;
     page-break-after: avoid;
     letter-spacing: 0;
+    text-wrap: balance;
   }
 
   .print-doc h1 {
     font-size: 20pt;
-    margin: 0 0 4pt;
+    line-height: 1.1;
+    margin: 0 0 6pt;
   }
 
   .print-doc h2 {
     font-size: 13pt;
-    margin: 16pt 0 6pt;
+    line-height: 1.2;
+    margin: 0 0 8pt;
     padding-bottom: 3pt;
     border-bottom: 1.5pt solid #111111;
   }
 
   .print-doc h3 {
     font-size: 11pt;
-    margin: 11pt 0 4pt;
+    line-height: 1.25;
+    margin: 14pt 0 5pt;
   }
 
   .print-doc h4 {
     font-size: 10pt;
-    margin: 8pt 0 3pt;
+    line-height: 1.3;
+    margin: 0 0 3pt;
   }
 
   .print-doc p {
-    margin: 0 0 5pt;
+    margin: 0 0 6pt;
     orphans: 3;
     widows: 3;
   }
@@ -154,7 +167,12 @@
   .print-doc .mono {
     font-family: var(--font-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
     font-size: 9pt;
-    word-break: break-all;
+  }
+
+  .print-doc .print-lead {
+    font-size: 10.5pt;
+    line-height: 1.5;
+    margin-bottom: 10pt;
   }
 
   /* --- cover --- */
@@ -162,21 +180,81 @@
   .print-cover {
     break-after: page;
     page-break-after: always;
-    padding-top: 4mm;
+    display: flex;
+    flex-direction: column;
+    /* A4 is 297mm tall and the page margins take 28mm, so 240mm leaves room
+       for a wrapped host name without spilling onto a second sheet. */
+    min-height: 240mm;
+    padding-top: 6mm;
   }
 
-  .print-cover__rule {
-    border: 0;
-    border-top: 2pt solid #111111;
-    margin: 8pt 0 14pt;
+  .print-doc .print-cover__product {
+    font-size: 11pt;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .print-doc .print-cover__kind {
+    font-size: 10pt;
+    color: #555555;
+    margin: 2pt 0 0;
+    padding-bottom: 10pt;
+    border-bottom: 2pt solid #111111;
+  }
+
+  .print-doc .print-cover__host {
+    margin-top: 16mm;
+    font-size: 20pt;
+    font-weight: 700;
+    word-break: break-word;
+  }
+
+  .print-score {
+    margin-top: 8mm;
+    display: flex;
+    align-items: baseline;
+    gap: 8pt;
+    border: 1.5pt solid #111111;
+    padding: 10pt 14pt;
+    align-self: flex-start;
+  }
+
+  .print-score__number {
+    font-size: 34pt;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .print-score__of {
+    font-size: 12pt;
+    color: #555555;
+  }
+
+  .print-score__grade {
+    margin-left: 12pt;
+    padding-left: 12pt;
+    border-left: 1pt solid #bbbbbb;
+    font-size: 13pt;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .print-doc .print-verdict {
+    font-size: 12pt;
+    font-weight: 600;
+    margin-top: 6pt;
   }
 
   .print-cover__meta {
     display: grid;
-    grid-template-columns: 34mm 1fr;
-    gap: 3pt 8pt;
-    margin: 0 0 14pt;
+    grid-template-columns: 34mm minmax(0, 1fr);
+    gap: 4pt 8pt;
+    margin: 12mm 0 10pt;
     font-size: 10pt;
+    border-top: 1pt solid #cccccc;
+    padding-top: 8pt;
   }
 
   .print-cover__meta dt {
@@ -185,106 +263,257 @@
 
   .print-cover__meta dd {
     margin: 0;
-    word-break: break-all;
   }
 
-  .print-score {
-    display: inline-block;
-    border: 1.5pt solid #111111;
-    padding: 8pt 14pt;
-    margin: 4pt 0 8pt;
+  .print-contents {
+    margin-top: auto;
+    padding-top: 8pt;
+    border-top: 1pt solid #cccccc;
   }
 
-  .print-score__number {
-    font-size: 30pt;
+  .print-doc .print-contents__title {
+    font-size: 9pt;
     font-weight: 700;
-    line-height: 1;
-    margin-right: 10pt;
-  }
-
-  .print-score__grade {
-    font-size: 13pt;
-    font-weight: 600;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    color: #555555;
+    margin: 0 0 4pt;
   }
 
-  .print-verdict {
-    font-size: 12pt;
-    font-weight: 600;
-    margin-top: 4pt;
+  .print-contents ol {
+    margin: 0;
+    padding-left: 16pt;
+    font-size: 10pt;
   }
 
-  /* --- tables --- */
+  .print-contents li {
+    margin: 1pt 0;
+  }
+
+  /* --- sections --- */
+
+  /*
+   * Sections flow on from each other. Only the cover forces a page break: a
+   * long appendix that tried to start fresh on every heading would leave half
+   * pages of white, and a block that fits should not be pushed.
+   */
+  .print-section {
+    margin-top: 14pt;
+  }
+
+  .print-footer.print-section {
+    margin-top: 18pt;
+  }
+
+  /* --- summary tables --- */
 
   .print-table {
     width: 100%;
     border-collapse: collapse;
-    margin: 4pt 0 10pt;
+    margin: 0 0 12pt;
     font-size: 10pt;
+    table-layout: fixed;
   }
 
   .print-table th,
   .print-table td {
-    border: 1pt solid #999999;
-    padding: 3pt 5pt;
+    border-bottom: 0.5pt solid #bbbbbb;
+    padding: 3pt 6pt 3pt 0;
     text-align: left;
     vertical-align: top;
   }
 
-  .print-table th {
-    background: #eeeeee;
+  .print-table thead th {
+    border-bottom: 1pt solid #111111;
+    font-size: 8.5pt;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #333333;
+  }
+
+  .print-table th[scope="row"] {
     font-weight: 600;
   }
 
-  .print-table td.num {
+  .print-table td.num,
+  .print-table th.num {
     text-align: right;
     font-variant-numeric: tabular-nums;
   }
 
-  .print-kv {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 3pt 0 6pt;
-    font-size: 9.5pt;
+  .print-table__total th,
+  .print-table__total td {
+    border-top: 1pt solid #111111;
+    border-bottom: 1pt solid #111111;
+    font-weight: 700;
   }
 
-  .print-kv th,
-  .print-kv td {
-    border-bottom: 0.5pt solid #cccccc;
-    padding: 2pt 5pt;
-    text-align: left;
-    vertical-align: top;
+  /* Five columns at an even split gives too much room to a number and too
+     little to the category name, which is the only one that wraps. Width is
+     declared on the head row because the table is fixed-layout. */
+  .print-table--category thead th:first-child {
+    width: 38%;
   }
 
-  .print-kv th {
-    width: 36mm;
-    color: #555555;
-    font-weight: 400;
+  .print-table--category thead th:last-child {
+    width: 11%;
   }
 
-  /* --- sections and page breaks --- */
+  /* --- callout --- */
 
-  .print-section {
+  .print-callout {
+    border-left: 3pt solid #111111;
+    background: #f4f4f4;
+    padding: 7pt 10pt;
+    margin-top: 4pt;
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+
+  .print-doc .print-callout__title {
+    font-size: 10pt;
+    font-weight: 700;
+    margin-bottom: 3pt;
+  }
+
+  .print-callout p:last-child {
+    margin-bottom: 0;
+  }
+
+  /* --- findings --- */
+
+  .print-category {
+    margin-top: 4pt;
+  }
+
+  .print-doc .print-category__title {
+    font-size: 11.5pt;
+    font-weight: 700;
+    margin: 12pt 0 1pt;
+    padding-bottom: 2pt;
+    border-bottom: 1pt solid #111111;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .print-doc .print-category__count {
+    font-size: 9pt;
+    color: #555555;
+    margin: 2pt 0 6pt;
+  }
+
+  .print-band {
+    margin-top: 6pt;
+  }
+
+  .print-doc .print-band__title {
+    font-size: 8.5pt;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #333333;
+    margin: 6pt 0 4pt;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .print-band__count {
+    font-weight: 400;
+    color: #555555;
   }
 
   .print-finding {
     break-inside: avoid;
     page-break-inside: avoid;
-    margin: 0 0 9pt;
-    padding: 0 0 0 7pt;
-    border-left: 2pt solid #bbbbbb;
+    margin: 0 0 10pt;
+    padding: 0 0 2pt 8pt;
+    border-left: 3pt solid #999999;
   }
 
-  /* --- checks, with the status as a greyscale-safe rail --- */
+  .print-finding--critical { border-left-color: #b32630; }
+  .print-finding--high { border-left-color: #b32630; }
+  .print-finding--medium { border-left-color: #92610a; }
+  .print-finding--low { border-left-color: #1b5f9e; }
+  .print-finding--info { border-left-color: #6b7686; }
+
+  .print-doc .print-finding__title {
+    font-size: 10.5pt;
+    font-weight: 700;
+    margin: 0;
+  }
+
+  .print-doc .print-finding__detail {
+    margin-top: 2pt;
+  }
+
+  .print-doc .print-finding__fix,
+  .print-doc .print-finding__ref {
+    margin-top: 2pt;
+    font-size: 9.5pt;
+  }
+
+  .print-finding__label {
+    font-weight: 700;
+  }
+
+  .print-doc .print-finding__check {
+    margin-top: 3pt;
+    font-size: 8.5pt;
+    color: #555555;
+  }
+
+  /* --- key/value tables (evidence, facts) --- */
+
+  .print-kv {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 3pt 0 4pt;
+    font-size: 9pt;
+    table-layout: fixed;
+  }
+
+  .print-kv__caption {
+    caption-side: top;
+    text-align: left;
+    font-size: 8pt;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #555555;
+    padding-bottom: 2pt;
+  }
+
+  .print-kv th,
+  .print-kv td {
+    border-top: 0.5pt solid #cccccc;
+    padding: 2pt 6pt 2pt 0;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .print-kv th {
+    width: 40mm;
+    color: #444444;
+    font-weight: 500;
+  }
+
+  /* --- appendix --- */
+
+  .print-appendix-group {
+    margin-top: 4pt;
+  }
+
+  .print-appendix-group h3 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
 
   .print-check {
     break-inside: avoid;
     page-break-inside: avoid;
-    margin: 0 0 8pt;
-    padding: 3pt 0 3pt 7pt;
+    margin: 0 0 9pt;
+    padding: 2pt 0 2pt 8pt;
     border-left: 3pt solid #999999;
   }
 
@@ -302,11 +531,17 @@
     gap: 8pt;
   }
 
+  .print-check__title {
+    font-size: 10pt;
+    font-weight: 700;
+  }
+
   .print-check__status {
+    flex: none;
     font-size: 8pt;
     font-weight: 700;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
     white-space: nowrap;
   }
 
@@ -317,50 +552,61 @@
   .print-check--unavailable .print-check__status,
   .print-check--skipped .print-check__status { color: #6b7686; }
 
-  .print-check__title {
-    font-size: 10.5pt;
-    font-weight: 600;
+  .print-doc .print-check__headline {
+    margin-top: 2pt;
+    font-size: 9.5pt;
   }
 
-  .print-check__source {
+  .print-doc .print-check__source {
     font-size: 8.5pt;
     color: #555555;
     margin-top: 2pt;
   }
 
-  .print-note {
-    font-size: 9pt;
+  .print-doc .print-note {
+    font-size: 8.5pt;
     color: #444444;
     margin-top: 2pt;
   }
 
-  /* --- links: print the destination, because paper cannot be clicked --- */
+  /* --- footer and provenance --- */
 
-  .print-doc a {
-    color: #111111;
-    text-decoration: none;
-    word-break: break-all;
-  }
-
-  .print-doc a[href^="http"]::after {
-    content: " (" attr(href) ")";
-    font-size: 8pt;
-    color: #555555;
-    word-break: break-all;
-  }
-
-  .print-doc a[href^="https://"]::after {
-    content: " (" attr(href) ")";
-  }
-
-  /* --- footer --- */
-
+  /*
+   * The footer is not kept whole. It carries the full source list, which can
+   * run to a page on its own, and an unbreakable block that tall would be
+   * pushed off the sheet entirely.
+   */
   .print-footer {
-    margin-top: 14pt;
-    padding-top: 6pt;
+    margin-top: 16pt;
+    padding-top: 8pt;
     border-top: 1pt solid #999999;
+    font-size: 9pt;
+    color: #333333;
+  }
+
+  .print-footer h2 {
+    border-bottom: none;
+    font-size: 12pt;
+    margin-bottom: 4pt;
+  }
+
+  .print-sources {
+    margin: 0 0 8pt;
+    padding-left: 0;
+    list-style: none;
     font-size: 8.5pt;
-    color: #444444;
+    color: #333333;
+  }
+
+  .print-sources li {
+    padding: 1.5pt 0;
+    border-bottom: 0.5pt solid #dddddd;
+  }
+
+  .print-doc .print-footer__stamp {
+    margin-top: 8pt;
+    font-size: 8pt;
+    color: #666666;
   }
 }
 
@@ -368,6 +614,7 @@
  * A finding can carry an unbroken token: a long URL, a CSP hash, a certificate
  * serial. On paper a token wider than the column overflows the sheet instead of
  * wrapping, so every text-bearing element is allowed to break anywhere.
+ * This applies in both media, because the same markup is in the DOM on screen.
  */
 .print-doc,
 .print-doc p,
@@ -381,13 +628,13 @@
 .print-doc h3,
 .print-doc h4,
 .print-doc code,
-.print-doc a {
+.print-doc a,
+.print-doc .mono {
   overflow-wrap: anywhere;
-  word-break: break-word;
   min-width: 0;
 }
 
-.print-table {
-  table-layout: fixed;
-  width: 100%;
+.print-doc a {
+  color: inherit;
+  text-decoration: none;
 }

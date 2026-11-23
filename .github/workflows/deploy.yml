@@ -33,15 +33,18 @@ jobs:
 
       - run: npx tsc --noEmit
 
-      # The base path has to match the repository name, otherwise every asset
-      # 404s. GITHUB_REPOSITORY is "owner/name", so take the name half.
+      # The base path has to match how Pages serves the site. A project site is
+      # served from /<repo>/, so every asset needs that prefix. A site on a
+      # custom domain is served from that domain's root, so the prefix must be
+      # empty or every asset 404s. Getting this wrong is invisible locally and
+      # total in production, so it is derived here rather than typed.
       - name: Build the Pages target
         env:
-          # SITE_URL is the custom apex/zone; OC_PAGES_CNAME writes the Pages
-          # CNAME file so the custom domain survives every deploy. Both are
-          # repository variables so the workflow never hard-codes a hostname.
+          # SITE_URL is the custom origin; CUSTOM_DOMAIN writes the Pages CNAME
+          # file so the domain survives every deploy. Both are repository
+          # variables, so the workflow never hard-codes a hostname.
           NEXT_PUBLIC_SITE_URL: ${{ vars.SITE_URL || format('https://{0}.github.io', github.repository_owner) }}
-          OC_PAGES_BASE: ${{ vars.PAGES_BASE || format('/{0}', github.event.repository.name) }}
+          OC_PAGES_BASE: ${{ vars.CUSTOM_DOMAIN == '' && (vars.PAGES_BASE || format('/{0}', github.event.repository.name)) || '' }}
           OC_PAGES_CNAME: ${{ vars.CUSTOM_DOMAIN }}
         run: node scripts/build.mjs pages
 

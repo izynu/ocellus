@@ -1,24 +1,22 @@
 #!/usr/bin/env node
 /**
- * Build both deployables from one source tree.
+ * Build the GitHub Pages deployable from the source tree.
  *
- *   node scripts/build.mjs cpanel    -> dist/cpanel/    (upload to public_html)
- *   node scripts/build.mjs pages     -> dist/pages/     (push to the gh-pages branch)
- *   node scripts/build.mjs all
+ *   node scripts/build.mjs pages
  *
- * The only difference between the two outputs is `basePath`. cPanel serves the
- * site from the document root, so the base path is empty. GitHub Pages serves a
- * project site from /<repo>/, so every asset URL needs that prefix baked in at
- * build time. Next.js can only apply basePath during the build, which is why
- * this runs the compiler twice rather than rewriting paths afterwards.
+ * GitHub Pages serves a project site from /<repo>/, so every asset URL needs
+ * that prefix baked in at build time. Next.js can only apply `basePath` during
+ * the build, which is why this runs the compiler rather than rewriting paths
+ * afterwards.
  *
  * Env:
  *   NEXT_PUBLIC_SITE_URL   canonical origin, e.g. https://izynu.github.io
  *   OC_PAGES_BASE          basePath for the Pages build, default "/ocellus"
+ *   OC_PAGES_CNAME         custom domain to write into CNAME, optional
  */
 
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
@@ -26,26 +24,29 @@ const dist = join(root, "dist");
 
 const PAGES_BASE = process.env.OC_PAGES_BASE || "/ocellus";
 
-function run(cmd, args, env) {
-  execFileSync(cmd, args, {
-    cwd: root,
-    stdio: "inherit",
-    env: { ...process.env, ...env },
-  });
-}
-
 function clean(dir) {
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
 }
 
-function buildOnce({ basePath, siteUrl, outDir }) {
-  console.log(`\n=== build: basePath=${basePath || "(none)"} site=${siteUrl}`);
-  // `out/` is Next's fixed export directory; it is moved after each build.
+function buildPages() {
+  const outDir = join(dist, "pages");
+  const origin = (process.env.NEXT_PUBLIC_SITE_URL || "https://izynu.github.io").replace(
+    /\/$/,
+    ""
+  );
+
+  console.log(`\n=== build: basePath=${PAGES_BASE} site=${origin}`);
+  // `out/` is Next's fixed export directory; it is moved to dist/pages after.
   rmSync(join(root, "out"), { recursive: true, force: true });
-  run("npx", ["next", "build"], {
-    OC_BASE_PATH: basePath,
-    NEXT_PUBLIC_SITE_URL: siteUrl,
+  execFileSync("npx", ["next", "build"], {
+    cwd: root,
+    stdio: "inherit",
+    env: {
+      ...process.env,
+      OC_BASE_PATH: PAGES_BASE,
+      NEXT_PUBLIC_SITE_URL: origin,
+    },
   });
   if (!existsSync(join(root, "out"))) {
     throw new Error("next build produced no out/ directory");
@@ -53,210 +54,57 @@ function buildOnce({ basePath, siteUrl, outDir }) {
   clean(outDir);
   cpSync(join(root, "out"), outDir, { recursive: true });
   rmSync(join(root, "out"), { recursive: true, force: true });
-}
-
-function cpanelSiteUrl() {
-  // Only used by the optional cPanel target. The default is the GitHub Pages
-  // origin so a bare `build:cpanel` without env still produces a valid site.
-  return (process.env.NEXT_PUBLIC_SITE_URL || "https://izynu.github.io").replace(/\/$/, "");
-}
-
-function pagesSiteUrl() {
-  const origin = (process.env.NEXT_PUBLIC_SITE_URL || "https://izynu.github.io").replace(
-    /\/$/,
-    ""
-  );
-  return origin + PAGES_BASE;
-}
-
-function buildCpanel() {
-  buildOnce({ basePath: "", siteUrl: cpanelSiteUrl(), outDir: join(dist, "cpanel") });
-  writeFileSync(join(dist, "cpanel", ".htaccess"), HTACCESS);
-  console.log("cpanel: wrote .htaccess");
-}
-
-function buildPages() {
-  const outDir = join(dist, "pages");
-  // The Pages build is served from /<repo>/, so the canonical origin passed to
-  // Next is origin + base. `SITE.url` appends OC_BASE_PATH itself, so hand Next
-  // the bare origin and let the base path be added once, in one place.
-  const origin = (process.env.NEXT_PUBLIC_SITE_URL || "https://izynu.github.io").replace(
-    /\/$/,
-    ""
-  );
-  buildOnce({ basePath: PAGES_BASE, siteUrl: origin, outDir });
 
   // GitHub Pages runs Jekyll unless told not to, and Jekyll drops paths that
   // start with an underscore, which breaks Next's _next/ asset directory.
   writeFileSync(join(outDir, ".nojekyll"), "");
 
   // A custom domain is set by a CNAME file at the root of what Pages serves.
-  // It is written here rather than committed to public/ so it can never be
-  // copied into the cPanel deploy, where a stray CNAME file would be a dead
-  // file at the document root. Empty or unset OC_PAGES_CNAME means the Pages
-  // site stays on its github.io host.
+  // Empty or unset OC_PAGES_CNAME means the Pages host stays canonical.
   const cname = (process.env.OC_PAGES_CNAME || "").trim();
   if (cname) {
     writeFileSync(join(outDir, "CNAME"), `${cname}\n`);
     console.log(`pages: custom domain ${cname}`);
+  } else if (PAGES_BASE === "") {
+    // A base path of "" is only correct when the site is served from an origin
+    // root, which on Pages means a custom domain. Building without one and
+    // without a prefix produces a site whose own assets 404, so it is a hard
+    // error rather than a warning.
+    throw new Error(
+      "OC_PAGES_BASE is empty but no custom domain was set. A project site must be built with /<repo>."
+    );
   }
-  console.log(`pages: base path ${PAGES_BASE}`);
-}
+  console.log(`pages: base path ${PAGES_BASE || "(none, custom domain root)"}`);
 
-function writeManifest() {
-  const manifest = {
-    builtAt: new Date().toISOString(),
-    targets: {
-      cpanel: {
-        dir: "dist/cpanel",
-        uploadTo: "public_html",
-        basePath: "",
-        siteUrl: cpanelSiteUrl(),
-      },
-      pages: {
+  writeFileSync(
+    join(dist, "build.json"),
+    JSON.stringify(
+      {
+        builtAt: new Date().toISOString(),
+        target: "github-pages",
         dir: "dist/pages",
-        uploadTo: "gh-pages branch",
         basePath: PAGES_BASE,
-        siteUrl: pagesSiteUrl(),
+        siteUrl: origin,
+        customDomain: cname || null,
       },
-    },
-  };
-  writeFileSync(join(dist, "build.json"), JSON.stringify(manifest, null, 2));
+      null,
+      2
+    )
+  );
 }
 
-/**
- * Apache rules for the cPanel target.
- *
- * The site is a static export with trailing slashes, so the only rewrite that
- * is needed is the one that maps /path/ onto /path/index.html, plus a real 404
- * page. The header block is the same policy the scanner grades, which means
- * this site can be scanned by its own tool and come out clean.
- */
-const HTACCESS = `# Ocellus, Apache configuration for a static export.
-# Generated by scripts/build.mjs. Edit the template there, not here.
-
-Options -MultiViews
-DirectoryIndex index.html
-ErrorDocument 404 /404.html
-
-<IfModule mod_rewrite.c>
-  RewriteEngine On
-
-  # Force HTTPS. The scanner flags an http:// hop, so the host should not serve
-  # one. The X-Forwarded-Proto test keeps this safe behind a TLS-terminating
-  # proxy, which shared cPanel hosting usually is.
-  RewriteCond %{HTTPS} !=on
-  RewriteCond %{HTTP:X-Forwarded-Proto} !https
-  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
-
-  # /path -> /path/ so relative asset URLs resolve against the directory.
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteCond %{REQUEST_URI} !(\\.[a-zA-Z0-9]{1,8})$
-  RewriteCond %{REQUEST_URI} !/$
-  RewriteRule ^(.*)$ /$1/ [L,R=301]
-
-  # /path/ -> /path/index.html
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule ^(.*)/$ /$1/index.html [L]
-</IfModule>
-
-<IfModule mod_headers.c>
-  Header always set Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
-  Header always set X-Content-Type-Options "nosniff"
-  Header always set Referrer-Policy "strict-origin-when-cross-origin"
-  Header always set X-Frame-Options "DENY"
-  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
-  Header always set Cross-Origin-Opener-Policy "same-origin"
-  # Set explicitly rather than left to the default: the scanner grades this
-  # header, so the site has to send it or it fails its own check.
-  Header always set Cross-Origin-Resource-Policy "same-origin"
-  # Next's static export uses inline bootstrap scripts, so 'unsafe-inline' is
-  # required for script-src. Everything else is locked to this origin.
-  # The scan is the whole point of the page, so connect-src has to permit every
-  # source a check queries, plus the RDAP bootstrap's per-registry redirect
-  # targets (which are a different host for every TLD and cannot be enumerated
-  # in advance). Enumerating them was the earlier defect: the list named ten
-  # origins while the checks used twenty-three, so most of a scan failed on the
-  # cPanel target with no visible cause. Everything except connect-src stays
-  # locked to this origin.
-  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests"
-  # Hashed assets never change under the same name, so cache them hard.
-  <FilesMatch "\\.(js|css|woff2|png|svg|ico)$">
-    Header set Cache-Control "public, max-age=31536000, immutable"
-  </FilesMatch>
-  <FilesMatch "\\.(html)$">
-    Header set Cache-Control "public, max-age=0, must-revalidate"
-  </FilesMatch>
-</IfModule>
-
-<IfModule mod_deflate.c>
-  AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json image/svg+xml text/plain
-</IfModule>
-
-<IfModule mod_expires.c>
-  ExpiresActive On
-  ExpiresByType text/html "access plus 0 seconds"
-  ExpiresByType text/css "access plus 1 year"
-  ExpiresByType application/javascript "access plus 1 year"
-  ExpiresByType font/woff2 "access plus 1 year"
-  ExpiresByType image/png "access plus 1 year"
-  ExpiresByType image/svg+xml "access plus 1 year"
-</IfModule>
-
-# No directory listing, and no serving of dotfiles.
-#
-# Require is Apache 2.4 syntax. On a 2.2 server the directive is a hard 500
-# for the whole site, so it sits behind a test for the module that provides it:
-# 2.2 has no mod_authz_core, so the block is skipped there and the 2.2 dialect
-# below takes over.
-#
-# Note what an IfModule test does not do: it tests whether a module is loaded,
-# not whether the host grants AllowOverride for the directive. A host that
-# allows mod_autoindex but denies AllowOverride Indexes still returns 500 on
-# Options -Indexes. The remedy for that case is renaming .htaccess, which the
-# runbook in docs/cpanel-deploy.html covers.
-<IfModule mod_autoindex.c>
-  Options -Indexes
-</IfModule>
-<IfModule mod_authz_core.c>
-  <FilesMatch "^\\.|(^|/)\\.git">
-    Require all denied
-  </FilesMatch>
-</IfModule>
-<IfModule !mod_authz_core.c>
-  <FilesMatch "^\\.|(^|/)\\.git">
-    Order allow,deny
-    Deny from all
-  </FilesMatch>
-</IfModule>
-`;
-
-const target = process.argv[2] || "all";
-mkdirSync(dist, { recursive: true });
-
-if (target !== "cpanel" && target !== "pages" && target !== "all") {
-  console.error(`Unknown target "${target}". Use cpanel, pages, or all.`);
+const target = process.argv[2] || "pages";
+if (target !== "pages") {
+  console.error(`Unknown target "${target}". This repository deploys to GitHub Pages only.`);
   process.exit(1);
 }
 
-if (target === "cpanel" || target === "all") buildCpanel();
-if (target === "pages" || target === "all") buildPages();
-writeManifest();
+mkdirSync(dist, { recursive: true });
+buildPages();
 
-for (const dir of ["cpanel", "pages"]) {
-  const path = join(dist, dir);
-  if (!existsSync(path)) continue;
-  const size = execFileSync("du", ["-sh", path], { encoding: "utf8" }).split("\t")[0];
-  const files = execFileSync("sh", ["-c", `find ${JSON.stringify(path)} -type f | wc -l`], {
-    encoding: "utf8",
-  }).trim();
-  console.log(`\n${dir}: ${files} files, ${size}`);
-}
-
-const index = join(dist, "cpanel", "index.html");
-if (existsSync(index)) {
-  const html = readFileSync(index, "utf8");
-  console.log(`cpanel index.html: ${(html.length / 1024).toFixed(1)} KB`);
-}
+const dir = join(dist, "pages");
+const size = execFileSync("du", ["-sh", dir], { encoding: "utf8" }).split("\t")[0];
+const files = execFileSync("sh", ["-c", `find ${JSON.stringify(dir)} -type f | wc -l`], {
+  encoding: "utf8",
+}).trim();
+console.log(`\npages: ${files} files, ${size}`);

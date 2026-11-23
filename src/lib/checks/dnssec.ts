@@ -107,12 +107,12 @@ export const dnssec: CheckDefinition = {
     // as an absent key would have reported a broken delegation as fact, when the
     // resolver was actually saying it could not validate the zone at all. The
     // record set is unknown, so the check declines rather than asserts.
-    const readStatuses = (res: typeof dsRes): boolean => answeredDefinitively(res);
-    if (!readStatuses(dsRes) || !readStatuses(keyRes)) {
-      const which = !readStatuses(dsRes) ? "DS" : "DNSKEY";
-      const code = !readStatuses(dsRes) ? dsRes.status : keyRes.status;
+    if (!answeredDefinitively(dsRes) || !answeredDefinitively(keyRes)) {
+      const dsUnreadable = !answeredDefinitively(dsRes);
+      const which = dsUnreadable ? "DS" : "DNSKEY";
+      const code = dsUnreadable ? dsRes.status : keyRes.status;
       const why =
-        code === 2
+        code === DNS_SERVFAIL
           ? "the resolver could not validate the zone (SERVFAIL), which is often a DNSSEC misconfiguration rather than an absence of records"
           : `the resolver answered with status ${code}, which is not a NOERROR or NODATA answer`;
       return {
@@ -125,6 +125,24 @@ export const dnssec: CheckDefinition = {
         ms: Math.round(performance.now() - started),
         source: dsRes.provider === keyRes.provider ? dsRes.provider : "DNS-over-HTTPS",
         note: `The ${which} query answered with status ${code}: ${why}. An empty answer is not an empty record set here, so no signing verdict is claimed. A SERVFAIL on a signed zone is itself worth checking with a zone validator such as dnsviz.net.`,
+      };
+    }
+
+    // Both queries returned NXDOMAIN: the name does not exist, so there is no
+    // zone to be signed or unsigned. The DNS records check reports the
+    // nonexistence as a critical finding, and a "not signed" finding here would
+    // stack a second conclusion on the same fact, so this check declines.
+    if (dsRes.status === DNS_NXDOMAIN && keyRes.status === DNS_NXDOMAIN) {
+      return {
+        id: this.id,
+        title: this.title,
+        question: this.question,
+        status: "info",
+        headline: `${domain} does not exist in DNS, so there is no zone to sign.`,
+        findings: [],
+        ms: Math.round(performance.now() - started),
+        source: dsRes.provider === keyRes.provider ? dsRes.provider : "DNS-over-HTTPS",
+        note: "Both lookups returned NXDOMAIN. The DNS records check reports the missing domain; this check makes no claim about signing for a name that does not resolve.",
       };
     }
 

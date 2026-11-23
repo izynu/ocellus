@@ -1,63 +1,85 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" width="1200" height="420" role="img" preserveAspectRatio="xMidYMid meet" aria-label="Ocellus, a browser-side audit of what a hostname exposes: DNS records, certificates, response headers, and the page itself, each read from a public source">
-  <title>Ocellus, a browser-side audit of one hostname</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 340" width="1200" height="340" role="img" preserveAspectRatio="xMidYMid meet" aria-label="The Ocellus wordmark beside a stylised simple eye: two slowly pulsing concentric rings around a filled pupil. The tagline reads: a browser-side website audit and reconnaissance console.">
+  <title>Ocellus, a browser-side website audit and reconnaissance console</title>
 
-  <!-- The canvas. One solid background, one fine grid, no gradient mesh. -->
-  <rect width="1200" height="420" fill="#0b0e13"/>
-  <g stroke="#232b36" stroke-width="1" opacity="0.55">
-    <path d="M0 60 H1200 M0 120 H1200 M0 180 H1200 M0 240 H1200 M0 300 H1200 M0 360 H1200"/>
-    <path d="M60 0 V420 M120 0 V420 M180 0 V420 M240 0 V420 M300 0 V420 M360 0 V420 M420 0 V420 M480 0 V420 M540 0 V420 M600 0 V420 M660 0 V420 M720 0 V420 M780 0 V420 M840 0 V420 M900 0 V420 M960 0 V420 M1020 0 V420 M1080 0 V420 M1140 0 V420"/>
+  <style>
+    /* A slow 4 second pulse on the eye rings. Opacity and scale only, so it
+       reads as breathing rather than spinning. */
+    .ring-outer {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: breathe-outer 4s ease-in-out infinite;
+    }
+    .ring-inner {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: breathe-inner 4s ease-in-out infinite;
+    }
+    .pupil {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: pupil-pulse 4s ease-in-out infinite;
+    }
+    @keyframes breathe-outer {
+      0%, 100% { opacity: 0.30; transform: scale(1); }
+      50%      { opacity: 0.55; transform: scale(1.035); }
+    }
+    @keyframes breathe-inner {
+      0%, 100% { opacity: 0.72; transform: scale(1); }
+      50%      { opacity: 1;    transform: scale(1.06); }
+    }
+    @keyframes pupil-pulse {
+      0%, 100% { opacity: 0.92; }
+      50%      { opacity: 1; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .ring-outer, .ring-inner, .pupil { animation: none; }
+      .ring-outer { opacity: 0.40; }
+      .ring-inner { opacity: 0.85; }
+      .pupil { opacity: 1; }
+    }
+  </style>
+
+  <defs>
+    <linearGradient id="hero-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#080c10"/>
+      <stop offset="1" stop-color="#101820"/>
+    </linearGradient>
+    <linearGradient id="hero-rule" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#38d2b6" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#38d2b6" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#38d2b6" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="340" fill="url(#hero-bg)"/>
+  <rect x="0.5" y="0.5" width="1199" height="339" fill="none" stroke="#1c2730"/>
+
+  <!-- Fine grid, kept faint so the mark carries the eye. -->
+  <g stroke="#1b222c" stroke-width="1" opacity="0.7">
+    <path d="M0 68 H1200 M0 136 H1200 M0 204 H1200 M0 272 H1200"/>
+    <path d="M100 0 V340 M200 0 V340 M300 0 V340 M400 0 V340 M500 0 V340 M600 0 V340 M700 0 V340 M800 0 V340 M900 0 V340 M1000 0 V340 M1100 0 V340"/>
   </g>
-  <rect x="0.5" y="0.5" width="1199" height="419" fill="none" stroke="#232b36"/>
 
-  <!-- Left: the mark. An ocellus is a simple eye: one lens that resolves light
-       and dark. Drawn as a filled pupil inside two concentric rings. -->
-  <g transform="translate(150 210)">
-    <circle r="104" fill="none" stroke="#232b36" stroke-width="1.5"/>
-    <circle r="78" fill="none" stroke="#4fd1c5" stroke-opacity="0.38" stroke-width="1.5"/>
-    <circle r="52" fill="none" stroke="#4fd1c5" stroke-opacity="0.7" stroke-width="1.5"/>
-    <circle r="26" fill="#4fd1c5"/>
-    <circle r="26" fill="none" stroke="#8ff0e6" stroke-opacity="0.55" stroke-width="1"/>
-    <!-- Four tick marks on the outer ring, at the diagonals. -->
-    <g stroke="#4fd1c5" stroke-opacity="0.5" stroke-width="1.5">
-      <path d="M-104 0 L-92 0 M92 0 L104 0 M0 -104 L0 -92 M0 92 L0 104"/>
+  <!-- The mark: an ocellus is a simple eye, one lens resolving light. -->
+  <g transform="translate(150 170)">
+    <circle class="ring-outer" r="96" fill="none" stroke="#38d2b6" stroke-width="1.5"/>
+    <circle r="96" fill="none" stroke="#1c2730" stroke-width="1"/>
+    <circle class="ring-inner" r="58" fill="none" stroke="#38d2b6" stroke-width="2"/>
+    <circle class="pupil" r="24" fill="#38d2b6"/>
+    <circle r="24" fill="none" stroke="#8ff0e6" stroke-opacity="0.5" stroke-width="1"/>
+    <g stroke="#38d2b6" stroke-opacity="0.45" stroke-width="1.5">
+      <path d="M-96 0 L-84 0 M84 0 L96 0 M0 -96 L0 -84 M0 84 L0 96"/>
     </g>
   </g>
 
-  <!-- Right: the wordmark and the one-line statement. -->
-  <g font-family="Inter, ui-sans-serif, system-ui, sans-serif">
-    <text x="330" y="150" fill="#e8ecf2" font-size="52" font-weight="600" letter-spacing="-1.4">Ocellus</text>
-    <text x="330" y="192" fill="#94a1b2" font-size="19" letter-spacing="0.2">A browser-side audit of what a hostname exposes.</text>
-    <text x="330" y="220" fill="#6f7c8d" font-size="16">32 checks. 12 groups. No server, no account, no API key.</text>
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+    <text x="300" y="146" fill="#e8ecf2" font-size="58" font-weight="600" letter-spacing="-1.6">Ocellus</text>
+    <text x="302" y="190" fill="#a7b3c2" font-size="20" letter-spacing="0.1">A browser-side website audit and reconnaissance console.</text>
+    <text x="302" y="220" fill="#7d8a9b" font-size="16">32 checks in 12 groups. No server, no account, no API key.</text>
   </g>
 
-  <!-- The four layers the audit reads, in order, as a short strip. -->
-  <g font-family="Inter, ui-sans-serif, system-ui, sans-serif" transform="translate(330 258)">
-    <g>
-      <rect x="0" y="0" width="188" height="66" rx="10" fill="#10151c" stroke="#232b36"/>
-      <circle cx="20" cy="22" r="4" fill="#5aa9e6"/>
-      <text x="34" y="27" fill="#e8ecf2" font-size="14" font-weight="600">Name system</text>
-      <text x="14" y="50" fill="#94a1b2" font-size="12">DNS, DNSSEC, WHOIS</text>
-    </g>
-    <g transform="translate(204 0)">
-      <rect x="0" y="0" width="188" height="66" rx="10" fill="#10151c" stroke="#232b36"/>
-      <circle cx="20" cy="22" r="4" fill="#5aa9e6"/>
-      <text x="34" y="27" fill="#e8ecf2" font-size="14" font-weight="600">Certificates</text>
-      <text x="14" y="50" fill="#94a1b2" font-size="12">CT logs, revocation</text>
-    </g>
-    <g transform="translate(408 0)">
-      <rect x="0" y="0" width="188" height="66" rx="10" fill="#10151c" stroke="#232b36"/>
-      <circle cx="20" cy="22" r="4" fill="#5aa9e6"/>
-      <text x="34" y="27" fill="#e8ecf2" font-size="14" font-weight="600">Headers</text>
-      <text x="14" y="50" fill="#94a1b2" font-size="12">CSP, HSTS, cookies</text>
-    </g>
-    <g transform="translate(612 0)">
-      <rect x="0" y="0" width="188" height="66" rx="10" fill="#10151c" stroke="#232b36"/>
-      <circle cx="20" cy="22" r="4" fill="#5aa9e6"/>
-      <text x="34" y="27" fill="#e8ecf2" font-size="14" font-weight="600">The page</text>
-      <text x="14" y="50" fill="#94a1b2" font-size="12">Markup, privacy, SEO</text>
-    </g>
-  </g>
-
-  <!-- Bottom rule: the honesty statement, in the muted colour, not a slogan. -->
-  <text x="330" y="366" font-family="Inter, ui-sans-serif, system-ui, sans-serif" fill="#6f7c8d" font-size="13">Every value is what a named public source returned, or an explicit statement that it could not be reached.</text>
+  <!-- The honesty line. Every value is sourced or explicitly absent. -->
+  <path d="M300 250 H1140" stroke="url(#hero-rule)" stroke-width="1"/>
+  <text x="300" y="282" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" fill="#7d8a9b" font-size="14">Every value is what a named public source returned, or an explicit statement that it could not be reached.</text>
+  <text x="300" y="306" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" fill="#5c6879" font-size="13">Your browser queries the sources directly. Nothing is uploaded, stored, or scored as a pass when it did not run.</text>
 </svg>

@@ -1,15 +1,12 @@
 {
   "name": "ocellus",
-  "version": "1.0.0",
+  "version": "1.3.0",
   "private": true,
-  "description": "A browser-side audit of what a website exposes, and what it asks of the people using it.",
+  "description": "A browser-side website audit and reconnaissance console: 37 checks across DNS, certificates, headers, email, exposure, reputation, privacy, accessibility and performance.",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
-    "build:cpanel": "node scripts/build.mjs cpanel",
-    "build:pages": "node scripts/build.mjs pages",
-    "build:all": "node scripts/build.mjs all",
-    "start": "npx serve out",
+    "build": "node scripts/build.mjs pages",
+    "start": "npx serve dist/pages",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },
