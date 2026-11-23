@@ -139,6 +139,22 @@ export const blocklist: CheckDefinition = {
     for (const { resolver, res } of answers) {
       if (!res.ok || !res.json) continue;
 
+      // A DoH answer carries its own status. SERVFAIL/REFUSED (2/5) are not
+      // "no record": the resolver failed to answer, and grading that as a clean
+      // resolution is the exact false pass this tool exists to avoid. Only
+      // NOERROR (0) and NXDOMAIN (3) describe a real outcome.
+      const dnsStatus = typeof res.json.Status === "number" ? res.json.Status : -1;
+      if (dnsStatus !== 0 && dnsStatus !== 3) {
+        rows.push({
+          name: resolver.name,
+          filters: resolver.filters,
+          verdict: "no-answer",
+          addresses: [],
+          comments: [`the resolver returned DNS status ${dnsStatus}, not an answer`],
+        });
+        continue;
+      }
+
       const addresses = (res.json.Answer ?? [])
         .filter((record) => record.type === 1 || record.type === 28)
         .map((record) => record.data ?? "")
@@ -181,12 +197,19 @@ export const blocklist: CheckDefinition = {
       });
     }
 
-    const status: CheckResult["status"] = blocked.length > 0 ? "warn" : "pass";
+    // A resolver that failed to answer is not a resolver that approved the
+    // domain. When none of them produced a real verdict, the check is
+    // unavailable rather than a pass.
+    const answered = rows.filter((row) => row.verdict !== "no-answer");
+    const status: CheckResult["status"] =
+      blocked.length > 0 ? "warn" : answered.length === 0 ? "unavailable" : "pass";
 
     const headline =
       blocked.length > 0
         ? `${blocked.length} of ${rows.length} filtering resolver${rows.length === 1 ? "" : "s"} refused to resolve ${domain}.`
-        : `${rows.length === 1 ? "The filtering resolver" : "Every filtering resolver"} answered normally for ${domain}.`;
+        : answered.length === 0
+          ? "No filtering resolver returned a usable verdict, so nothing can be said about whether this domain is blocked."
+          : `${answered.length === 1 ? "The filtering resolver" : "Every filtering resolver"} answered normally for ${domain}.`;
 
     return {
       id: this.id,

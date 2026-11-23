@@ -153,16 +153,21 @@ export const techStack: CheckDefinition = {
     const server = header(snapshot, "server") ?? null;
     const poweredBy = header(snapshot, "x-powered-by") ?? null;
 
-    if (server) {
+    // When the header block is an edge refusing the request rather than the
+    // site's own response, every header in it is the edge's. Fingerprinting that
+    // page reports Cloudflare's stack as the site's, and a challenge page that
+    // happens to name nothing would read as a clean stack.
+    if (server && !snapshot.challenge) {
       const product = SERVER_PATTERNS.find((p) => p.match.test(server));
       add(product?.name ?? "HTTP server", product?.category ?? "Server", `server: ${server}`, "high");
     }
-    if (poweredBy) {
+    if (poweredBy && !snapshot.challenge) {
       const product = SERVER_PATTERNS.find((p) => p.match.test(poweredBy));
       add(product?.name ?? "Application framework", product?.category ?? "Framework", `x-powered-by: ${poweredBy}`, "high");
     }
 
     for (const probe of HEADER_TECH) {
+      if (snapshot.challenge) break;
       const value = header(snapshot, probe.header);
       if (!value) continue;
       if (probe.match && !probe.match.test(value)) continue;

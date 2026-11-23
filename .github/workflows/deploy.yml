@@ -37,8 +37,12 @@ jobs:
       # 404s. GITHUB_REPOSITORY is "owner/name", so take the name half.
       - name: Build the Pages target
         env:
+          # SITE_URL is the custom apex/zone; OC_PAGES_CNAME writes the Pages
+          # CNAME file so the custom domain survives every deploy. Both are
+          # repository variables so the workflow never hard-codes a hostname.
           NEXT_PUBLIC_SITE_URL: ${{ vars.SITE_URL || format('https://{0}.github.io', github.repository_owner) }}
-          OC_PAGES_BASE: /${{ github.event.repository.name }}
+          OC_PAGES_BASE: ${{ vars.PAGES_BASE || format('/{0}', github.event.repository.name) }}
+          OC_PAGES_CNAME: ${{ vars.CUSTOM_DOMAIN }}
         run: node scripts/build.mjs pages
 
       - uses: actions/configure-pages@v5

@@ -272,6 +272,7 @@ export const emailAuth: CheckDefinition = {
     // report "no policy file" universally.
     let mtaStsFileOk = false;
     let mtaStsMode: string | null = null;
+    let mtaStsUnknown = false;
     if (mtaStsTxt) {
       const policyRes = await ctx.net.text(
         `https://r.jina.ai/https://mta-sts.${domain}/.well-known/mta-sts.txt`,
@@ -287,6 +288,11 @@ export const emailAuth: CheckDefinition = {
           mtaStsFileOk = true;
           mtaStsMode = /mode\s*:\s*([a-z]+)/.exec(body)?.[1] ?? null;
         }
+      } else {
+        // The read failed, which is not the same as a policy file that does not
+        // exist. Saying it does not exist published a finding about a file
+        // nobody had read.
+        mtaStsUnknown = true;
       }
     }
 
@@ -311,9 +317,21 @@ export const emailAuth: CheckDefinition = {
     // `protonmail3` or `hostingermail-b` was reported as having no DKIM at all.
     // Each lookup is one DoH request and the resolver caches by name, so the
     // full list costs a second on a cold scan and nothing afterwards.
-    const dkim = await Promise.all(
-      DKIM_SELECTORS.map(async (selector) => {
+    type DkimProbe = {
+      selector: string;
+      present: boolean;
+      unknown: boolean;
+      keyType?: string;
+      bits?: number;
+      revoked?: boolean;
+    };
+    const dkim: DkimProbe[] = await Promise.all(
+      DKIM_SELECTORS.map(async (selector): Promise<DkimProbe> => {
         const res = await ctx.dns.query(`${selector}._domainkey.${domain}`, "TXT");
+        // A lookup that failed says nothing about whether the selector has a
+        // key. Counting it as "absent" produced a fabricated "No DKIM key
+        // found" finding whenever the resolver was briefly unavailable.
+        if (res.failed) return { selector, present: false, unknown: true };
         const record = res.answers
           .filter((r) => r.type === 16)
           .map((r) => unquoteTxt(r.data))
@@ -322,10 +340,11 @@ export const emailAuth: CheckDefinition = {
           // anywhere, which is not evidence of a DKIM key.
           .find((t) => /(?:^|;\s*)v=DKIM1\b/i.test(t) || /(?:^|;\s*)p=/i.test(t));
         return record
-          ? { selector, present: true, ...dkimKeyInfo(record) }
-          : { selector, present: false };
+          ? { selector, present: true, unknown: false, ...dkimKeyInfo(record) }
+          : { selector, present: false, unknown: false };
       })
     );
+    const dkimAllUnknown = dkim.every((d) => d.unknown);
 
     // A zone that publishes a wildcard under _domainkey answers every selector
     // with the same record, including selectors nobody has ever used. On such a
@@ -492,7 +511,7 @@ export const emailAuth: CheckDefinition = {
         reference: { label: "RFC 6376 §3.6.1", url: "https://datatracker.ietf.org/doc/html/rfc6376#section-3.6.1" },
       });
     }
-    if (dkimFound.length === 0 && !dkimWildcard) {
+    if (dkimFound.length === 0 && !dkimWildcard && !dkimAllUnknown) {
       findings.push({
         id: "email-dkim-unknown",
         title: "No DKIM key found on a common selector",
@@ -527,7 +546,7 @@ export const emailAuth: CheckDefinition = {
           "Publish a _mta-sts TXT record and host a policy file at https://mta-sts.yourdomain/.well-known/mta-sts.txt with mode: enforce.",
         reference: { label: "RFC 8461", url: "https://datatracker.ietf.org/doc/html/rfc8461" },
       });
-    } else if (mtaStsTxt && !mtaStsFileOk) {
+    } else if (mtaStsTxt && !mtaStsFileOk && !mtaStsUnknown) {
       // The record exists but the policy file did not. RFC 8461 §3 makes both
       // mandatory, and senders that cannot fetch the file fall back to the
       // record's cached policy or to no policy at all, so this is not a

@@ -396,7 +396,7 @@ export function ScanWorkspace() {
               gap: 10,
             }}
           >
-            <p className="tabular" style={{ fontSize: 14, minWidth: 0 }}>
+            <p className="tabular scan-summary" style={{ fontSize: 14, minWidth: 0 }}>
               {summary}
             </p>
             <button type="button" className="btn btn-quiet btn-sm" onClick={reset}>

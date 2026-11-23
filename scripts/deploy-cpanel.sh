@@ -3,8 +3,8 @@
 #
 # Usage: scripts/deploy-cpanel.sh <user@host> [docroot]
 #
-#   scripts/deploy-cpanel.sh zynu@ocellus.zynu.me
-#   scripts/deploy-cpanel.sh zynu@148.113.1.25 ~/public_html
+#   scripts/deploy-cpanel.sh deploy@your-host.example.com
+#   scripts/deploy-cpanel.sh deploy@148.113.1.25 ~/public_html
 #
 # The docroot is optional. When it is omitted the script asks the account where
 # the domain is actually served from, because cPanel puts the primary domain in
@@ -19,7 +19,9 @@ TARGET="${1:?usage: scripts/deploy-cpanel.sh <user@host> [docroot]}"
 DOCROOT="${2:-}"
 KEY="$HOME/.ssh/ocellus-deploy"
 SRC="$(cd "$(dirname "$0")/.." && pwd)/dist/cpanel"
-SITE="https://ocellus.zynu.me"
+# The URL to check after upload. Defaults to the GitHub Pages site, which is the
+# primary deployment; override it for a cPanel host with SITE_URL in the env.
+SITE="${SITE_URL:-https://izynu.github.io/ocellus}"
 
 [ -d "$SRC" ] || { echo "no build at $SRC; run npm run build:cpanel first" >&2; exit 1; }
 [ -f "$KEY" ] || { echo "missing key at $KEY" >&2; exit 1; }
@@ -41,7 +43,7 @@ if [ -z "$DOCROOT" ]; then
   DOCROOT="$("${SSH[@]}" 'uapi DomainInfo list_domains 2>/dev/null | sed -n "s/.*documentroot: *//p" | head -1' 2>/dev/null || true)"
   if [ -z "$DOCROOT" ]; then
     # The two layouts cPanel uses, in its own order.
-    DOCROOT="$("${SSH[@]}" 'if [ -d "$HOME/ocellus.zynu.me" ]; then echo "$HOME/ocellus.zynu.me"; else echo "$HOME/public_html"; fi')"
+    DOCROOT="$("${SSH[@]}" 'if [ -d "$HOME/public_html" ]; then echo "$HOME/public_html"; else echo "$HOME"; fi')"
   fi
 fi
 

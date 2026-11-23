@@ -1,6 +1,6 @@
 import { SiteShell } from "@/components/site/site-shell";
 import { checks, GROUP_LABEL, GROUP_ORDER, groupOf } from "@/lib/checks";
-import { SITE, asset, pageMeta } from "@/lib/site";
+import { asset, pageMeta } from "@/lib/site";
 
 /**
  * The check catalogue.
@@ -48,7 +48,9 @@ export default function ChecksPage() {
           <p>
             The score is the weighted mean of each check&apos;s status fraction over the checks
             that returned a verdict. The exact fractions, the treatment of unavailable results
-            and the grade bands are on the <a href={asset("/method")}>method page</a>.
+            and the grade bands are on the <a href={asset("/method")}>method page</a>. The
+            findings themselves are grouped by area in every report, so a certificate problem
+            and a cookie problem never appear in the same list.
           </p>
         </div>
       </header>
@@ -58,11 +60,18 @@ export default function ChecksPage() {
         if (members.length === 0) return null;
         const headingId = `group-${group}`;
         return (
-          <section key={group} className="mt-12 md:mt-16" aria-labelledby={headingId}>
+          <section
+            key={group}
+            className={`mt-12 md:mt-16 area-${group}`}
+            aria-labelledby={headingId}
+          >
             <div className="flex flex-wrap items-baseline justify-between gap-3">
-              <h2 id={headingId} style={{ fontSize: 22 }}>
-                {GROUP_LABEL[group]}
-              </h2>
+              <div className="area-head">
+                <span className="dot" aria-hidden="true" />
+                <h2 id={headingId} style={{ fontSize: 22 }}>
+                  {GROUP_LABEL[group]}
+                </h2>
+              </div>
               <p
                 className="tabular"
                 style={{ fontSize: 13, color: "var(--muted-foreground)" }}
@@ -75,11 +84,11 @@ export default function ChecksPage() {
               {members.map((check, index) => (
                 <li
                   key={check.id}
-                  className="box rise"
+                  className="box box--area rise"
                   style={{ ["--i" as string]: Math.min(index + groupIndex, 8) }}
                 >
                   <div className="box__head">
-                    <span className="dot tone-info" aria-hidden="true" />
+                    <span className="dot" aria-hidden="true" />
                     <h3 className="box__title">{check.title}</h3>
                   </div>
                   <p className="box__body">{check.question}</p>

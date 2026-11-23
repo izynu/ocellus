@@ -231,8 +231,15 @@ export const threatIntel: CheckDefinition = {
       };
     }
 
-    const pulseCount = typeof body.pulse_info?.count === "number" ? body.pulse_info.count : 0;
     const pulses = Array.isArray(body.pulse_info?.pulses) ? body.pulse_info.pulses : [];
+    // A pulse_info object with an unreadable count is not "zero pulses". The
+    // pulses array is the fallback, and if both are absent the check must say
+    // it could not read the count rather than report a clean result.
+    const rawCount = body.pulse_info?.count;
+    const pulseCount =
+      typeof rawCount === "number" && Number.isFinite(rawCount)
+        ? rawCount
+        : pulses.length;
     const validations = Array.isArray(body.validation) ? body.validation : [];
     const falsePositive = body.false_positive === true;
 

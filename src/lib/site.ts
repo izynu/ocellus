@@ -3,9 +3,9 @@
  *
  * Two values change per deployment and live only here:
  *
- *   NEXT_PUBLIC_SITE_URL  the origin, e.g. https://ocellus.zynu.me
+ *   NEXT_PUBLIC_SITE_URL  the origin, e.g. https://izynu.github.io
  *   OC_BASE_PATH          the path prefix, empty at a document root and
- *                         "/ocellus" for a GitHub project site
+ *                         "/ocellus" for this GitHub project site
  *
  * Next applies the base path to `next/link` and to bundled assets by itself.
  * It does not apply it to literal strings in metadata (icons, manifest,
@@ -14,7 +14,7 @@
 
 export const BASE_PATH = (process.env.OC_BASE_PATH || "").replace(/\/$/, "");
 
-const ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL || "https://ocellus.zynu.me").replace(
+const ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL || "https://izynu.github.io").replace(
   /\/$/,
   ""
 );
@@ -98,6 +98,9 @@ export const ROUTES = [
   { href: "/", label: "Home" },
   { href: "/scan", label: "Scan" },
   { href: "/checks", label: "Checks" },
+  { href: "/recon", label: "Recon" },
+  { href: "/dorks", label: "Dorks" },
+  { href: "/scanners", label: "Scanners" },
   { href: "/method", label: "Method" },
   { href: "/about", label: "About" },
 ] as const;

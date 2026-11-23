@@ -104,7 +104,7 @@ export function FindingRow({ finding }: { finding: Finding }) {
         </span>
       </div>
 
-      <p style={{ marginTop: 6, fontSize: 14, color: "var(--muted-foreground)" }}>
+      <p style={{ marginTop: 6, fontSize: 14, color: "var(--muted-foreground)", overflowWrap: "anywhere" }}>
         {finding.detail}
       </p>
 
@@ -167,7 +167,7 @@ export function FindingRow({ finding }: { finding: Finding }) {
             )}
 
             {finding.remediation && (
-              <p style={{ fontSize: 14, maxWidth: "68ch" }}>{finding.remediation}</p>
+              <p style={{ fontSize: 14, maxWidth: "68ch", overflowWrap: "anywhere" }}>{finding.remediation}</p>
             )}
 
             {finding.reference && isHttpUrl(finding.reference.url) && (

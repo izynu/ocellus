@@ -1,201 +1,114 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 260" width="1200" height="260" role="img" aria-label="A scan runs in three steps: the browser asks public sources, checks resolve one at a time, and a report is produced">
-  <defs>
-    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
-      <stop offset="0" stop-color="#4fd1c5" stop-opacity="0.10"/>
-      <stop offset="1" stop-color="#4fd1c5" stop-opacity="0"/>
-    </radialGradient>
-    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-      <path d="M40 0H0V40" fill="none" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/>
-    </pattern>
-    <style>
-      text {
-        font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif;
-      }
-      .mono {
-        font-family: "JetBrains Mono", SFMono-Regular, Menlo, monospace;
-      }
-      .panel {
-        fill: #10151c;
-        stroke: #ffffff;
-        stroke-opacity: 0.08;
-      }
-      .title {
-        fill: #e8ecf2;
-        font-size: 17px;
-        font-weight: 600;
-      }
-      .sub {
-        fill: #94a1b2;
-        font-size: 13px;
-      }
-      .row {
-        fill: #aab5c3;
-        font-size: 13.5px;
-      }
-      .chip {
-        fill: #161d26;
-        stroke: #ffffff;
-        stroke-opacity: 0.06;
-      }
-      .chip-text {
-        fill: #8d99a9;
-        font-size: 11px;
-      }
-      .wire {
-        stroke: #2b3543;
-        stroke-width: 1.5;
-      }
-      .fade {
-        animation: fade 0.55s ease-out both;
-      }
-      .resolve {
-        animation: resolve 0.45s ease-out both;
-      }
-      .rail-fill {
-        transform-box: fill-box;
-        transform-origin: 0 50%;
-        animation: rail 5.6s ease-in-out infinite;
-      }
-      @keyframes fade {
-        from { opacity: 0; }
-        to { opacity: 1; }
-      }
-      @keyframes resolve {
-        from { opacity: 0; transform: translateX(-8px); }
-        to { opacity: 1; transform: translateX(0); }
-      }
-      @keyframes rail {
-        0% { transform: scaleX(0); }
-        55% { transform: scaleX(1); }
-        85% { transform: scaleX(1); }
-        86% { transform: scaleX(0); }
-        100% { transform: scaleX(0); }
-      }
-      @media (prefers-reduced-motion: reduce) {
-        .motion { display: none; }
-        .fade, .resolve { animation: none; }
-        .rail-fill { animation: none; transform: scaleX(1); }
-      }
-    </style>
-  </defs>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 300" width="1200" height="300" role="img" preserveAspectRatio="xMidYMid meet" aria-label="A scan runs in three stages. Your browser asks public sources. The checks resolve one at a time, each landing as its source answers. The report shows what passed, what warned, what failed and what could not run, and nothing that could not run is counted as a pass.">
+  <title>How a scan runs: sources, checks, report</title>
 
-  <rect width="1200" height="260" fill="#0b0e13"/>
-  <rect width="1200" height="260" fill="url(#grid)"/>
-  <ellipse cx="600" cy="140" rx="520" ry="140" fill="url(#glow)"/>
+  <rect width="1200" height="300" fill="#0b0e13"/>
+  <rect x="0.5" y="0.5" width="1199" height="299" fill="none" stroke="#232b36"/>
 
-  <text x="48" y="30" class="mono" font-size="11" letter-spacing="2.5" fill="#5c6878">SCAN FLOW</text>
+  <!-- Stage labels across the top. -->
+  <g font-family="Inter, ui-sans-serif, system-ui, sans-serif">
+    <text x="40" y="40" fill="#5a6676" font-size="12" letter-spacing="1.6">01  SOURCES</text>
+    <text x="430" y="40" fill="#5a6676" font-size="12" letter-spacing="1.6">02  CHECKS</text>
+    <text x="820" y="40" fill="#5a6676" font-size="12" letter-spacing="1.6">03  REPORT</text>
+  </g>
 
-  <!-- Step one: the browser, and the public sources it queries directly. -->
-  <g class="fade" style="animation-delay:.05s">
-    <rect x="48" y="48" width="212" height="176" rx="12" class="panel"/>
-    <text x="72" y="82" class="title">Browser</text>
-    <text x="72" y="102" class="sub">asks public sources</text>
+  <!--   Stage 1: your browser asks public sources   -->
+  <g transform="translate(40 62)" font-family="Inter, ui-sans-serif, system-ui, sans-serif">
+    <rect x="0" y="0" width="330" height="196" rx="12" fill="#10151c" stroke="#232b36"/>
+    <text x="18" y="28" fill="#e8ecf2" font-size="15" font-weight="600">Your browser</text>
+    <text x="18" y="48" fill="#94a1b2" font-size="12">Queries each source directly.</text>
 
-    <g class="mono">
-      <rect x="64" y="114" width="140" height="22" rx="6" class="chip"/>
-      <text x="76" y="129" class="chip-text">DNS over HTTPS</text>
+    <!-- Three source chips, named for what they answer. -->
+    <g font-size="12">
+      <rect x="18" y="64" width="138" height="30" rx="7" fill="#0b0e13" stroke="#232b36"/>
+      <text x="30" y="84" fill="#c8d2df">DNS over HTTPS</text>
 
-      <rect x="64" y="140" width="140" height="22" rx="6" class="chip"/>
-      <text x="76" y="155" class="chip-text">certificate logs</text>
+      <rect x="174" y="64" width="138" height="30" rx="7" fill="#0b0e13" stroke="#232b36"/>
+      <text x="186" y="84" fill="#c8d2df">CT logs</text>
 
-      <rect x="64" y="166" width="140" height="22" rx="6" class="chip"/>
-      <text x="76" y="181" class="chip-text">response headers</text>
+      <rect x="18" y="102" width="138" height="30" rx="7" fill="#0b0e13" stroke="#232b36"/>
+      <text x="30" y="122" fill="#c8d2df">Response headers</text>
 
-      <rect x="64" y="192" width="140" height="22" rx="6" class="chip"/>
-      <text x="76" y="207" class="chip-text">the page itself</text>
+      <rect x="174" y="102" width="138" height="30" rx="7" fill="#0b0e13" stroke="#232b36"/>
+      <text x="186" y="122" fill="#c8d2df">The page</text>
+
+      <rect x="18" y="140" width="138" height="30" rx="7" fill="#0b0e13" stroke="#232b36"/>
+      <text x="30" y="160" fill="#c8d2df">Reputation feeds</text>
+
+      <rect x="174" y="140" width="138" height="30" rx="7" fill="#0b0e13" stroke="#232b36"/>
+      <text x="186" y="160" fill="#c8d2df">Passive DNS</text>
+    </g>
+    <text x="18" y="186" fill="#5a6676" font-size="11">CORS is required. No key is used.</text>
+  </g>
+
+  <!-- Arrow 1 -->
+  <g stroke="#4fd1c5" stroke-width="1.5" fill="none" opacity="0.75">
+    <path d="M378 160 H412"/>
+    <path d="M404 154 L412 160 L404 166"/>
+  </g>
+
+  <!--   Stage 2: checks resolve one at a time   -->
+  <g transform="translate(420 62)" font-family="Inter, ui-sans-serif, system-ui, sans-serif">
+    <rect x="0" y="0" width="330" height="196" rx="12" fill="#10151c" stroke="#232b36"/>
+    <text x="18" y="28" fill="#e8ecf2" font-size="15" font-weight="600">Checks resolve</text>
+    <text x="18" y="48" fill="#94a1b2" font-size="12">One at a time, as each source answers.</text>
+
+    <!-- Four check rows, each with a status dot. -->
+    <g font-size="12.5">
+      <circle cx="26" cy="74" r="4.5" fill="#56c98a"/>
+      <text x="40" y="79" fill="#c8d2df">DNS records</text>
+      <text x="288" y="79" fill="#56c98a" text-anchor="end" font-size="11">pass</text>
+
+      <circle cx="26" cy="104" r="4.5" fill="#56c98a"/>
+      <text x="40" y="109" fill="#c8d2df">Certificates</text>
+      <text x="288" y="109" fill="#56c98a" text-anchor="end" font-size="11">pass</text>
+
+      <circle cx="26" cy="134" r="4.5" fill="#e0a33a"/>
+      <text x="40" y="139" fill="#c8d2df">Security headers</text>
+      <text x="288" y="139" fill="#e0a33a" text-anchor="end" font-size="11">warn</text>
+
+      <circle cx="26" cy="164" r="4.5" fill="#7b8798"/>
+      <text x="40" y="169" fill="#c8d2df">Popularity rank</text>
+      <text x="288" y="169" fill="#7b8798" text-anchor="end" font-size="11">unavailable</text>
     </g>
   </g>
 
-  <!-- Connector one, with a dot travelling along it. -->
-  <g class="fade" style="animation-delay:.25s">
-    <line x1="260" y1="136" x2="384" y2="136" class="wire"/>
-    <polygon points="384,131 392,136 384,141" fill="#33404f"/>
-    <text x="326" y="126" class="mono" font-size="10.5" fill="#5c6878" text-anchor="middle">public data</text>
-  </g>
-  <g class="motion">
-    <g transform="translate(260,136)">
-      <circle r="3.5" fill="#4fd1c5">
-        <animateMotion dur="2.6s" repeatCount="indefinite" path="M0,0 L124,0"/>
-      </circle>
-      <circle r="2.2" fill="#4fd1c5" fill-opacity="0.45">
-        <animateMotion dur="2.6s" begin="1.3s" repeatCount="indefinite" path="M0,0 L124,0"/>
-      </circle>
-    </g>
+  <!-- Arrow 2 -->
+  <g stroke="#4fd1c5" stroke-width="1.5" fill="none" opacity="0.75">
+    <path d="M758 160 H792"/>
+    <path d="M784 154 L792 160 L784 166"/>
   </g>
 
-  <!-- Step two: checks resolving one at a time. -->
-  <g class="fade" style="animation-delay:.35s">
-    <rect x="392" y="48" width="372" height="176" rx="12" class="panel"/>
-    <text x="416" y="82" class="title">Checks</text>
-    <text x="416" y="102" class="sub">resolve one at a time</text>
+  <!--   Stage 3: the report   -->
+  <g transform="translate(810 62)" font-family="Inter, ui-sans-serif, system-ui, sans-serif">
+    <rect x="0" y="0" width="350" height="196" rx="12" fill="#10151c" stroke="#232b36"/>
+    <text x="18" y="28" fill="#e8ecf2" font-size="15" font-weight="600">The report</text>
+    <text x="18" y="48" fill="#94a1b2" font-size="12">Measured, separated from missing.</text>
 
-    <g class="resolve" style="animation-delay:.55s">
-      <circle cx="416" cy="124" r="4.5" fill="#56c98a"/>
-      <text x="432" y="128" class="row">dns records</text>
-      <text x="740" y="128" class="mono" font-size="10.5" fill="#56c98a" text-anchor="end">pass</text>
+    <!-- Four status columns with a count each. The counts are illustrative of a
+         shape, not a claim about any site: the note below says so. -->
+    <g font-size="11">
+      <rect x="18" y="66" width="74" height="76" rx="8" fill="#0b0e13" stroke="#232b36"/>
+      <circle cx="34" cy="84" r="4" fill="#56c98a"/>
+      <text x="46" y="88" fill="#94a1b2">pass</text>
+      <text x="34" y="126" fill="#56c98a" font-size="24" font-weight="600">21</text>
+
+      <rect x="100" y="66" width="74" height="76" rx="8" fill="#0b0e13" stroke="#232b36"/>
+      <circle cx="116" cy="84" r="4" fill="#e0a33a"/>
+      <text x="128" y="88" fill="#94a1b2">warn</text>
+      <text x="116" y="126" fill="#e0a33a" font-size="24" font-weight="600">5</text>
+
+      <rect x="182" y="66" width="74" height="76" rx="8" fill="#0b0e13" stroke="#232b36"/>
+      <circle cx="198" cy="84" r="4" fill="#ef6a72"/>
+      <text x="210" y="88" fill="#94a1b2">fail</text>
+      <text x="198" y="126" fill="#ef6a72" font-size="24" font-weight="600">2</text>
+
+      <rect x="264" y="66" width="68" height="76" rx="8" fill="#0b0e13" stroke="#232b36"/>
+      <circle cx="280" cy="84" r="4" fill="#7b8798"/>
+      <text x="292" y="88" fill="#94a1b2">n/a</text>
+      <text x="280" y="126" fill="#7b8798" font-size="24" font-weight="600">4</text>
     </g>
 
-    <g class="resolve" style="animation-delay:.70s">
-      <circle cx="416" cy="146" r="4.5" fill="#56c98a"/>
-      <text x="432" y="150" class="row">certificates</text>
-      <text x="740" y="150" class="mono" font-size="10.5" fill="#56c98a" text-anchor="end">pass</text>
-    </g>
-
-    <g class="resolve" style="animation-delay:.85s">
-      <circle cx="416" cy="168" r="4.5" fill="#e0a33a"/>
-      <text x="432" y="172" class="row">response headers</text>
-      <text x="740" y="172" class="mono" font-size="10.5" fill="#e0a33a" text-anchor="end">warn</text>
-    </g>
-
-    <g class="resolve" style="animation-delay:1.00s">
-      <circle cx="416" cy="190" r="4.5" fill="#ef6a72"/>
-      <text x="432" y="194" class="row">email auth</text>
-      <text x="740" y="194" class="mono" font-size="10.5" fill="#ef6a72" text-anchor="end">fail</text>
-    </g>
-
-    <g class="resolve" style="animation-delay:1.15s">
-      <circle cx="416" cy="212" r="4.5" fill="#5aa9e6"/>
-      <text x="432" y="216" class="row">privacy</text>
-      <text x="740" y="216" class="mono" font-size="10.5" fill="#5aa9e6" text-anchor="end">info</text>
-    </g>
+    <text x="18" y="166" fill="#94a1b2" font-size="12">The score covers the checks that ran.</text>
+    <text x="18" y="184" fill="#5a6676" font-size="11">An unavailable check is never counted as a pass.</text>
   </g>
-
-  <!-- Connector two. -->
-  <g class="fade" style="animation-delay:1.30s">
-    <line x1="764" y1="136" x2="884" y2="136" class="wire"/>
-    <polygon points="884,131 892,136 884,141" fill="#33404f"/>
-    <text x="828" y="126" class="mono" font-size="10.5" fill="#5c6878" text-anchor="middle">results</text>
-  </g>
-  <g class="motion">
-    <g transform="translate(764,136)">
-      <circle r="3.5" fill="#4fd1c5">
-        <animateMotion dur="2.6s" begin="0.8s" repeatCount="indefinite" path="M0,0 L120,0"/>
-      </circle>
-    </g>
-  </g>
-
-  <!-- Step three: the report, with a rail that fills as the checks settle. -->
-  <g class="fade" style="animation-delay:1.45s">
-    <rect x="892" y="48" width="260" height="176" rx="12" class="panel"/>
-    <text x="916" y="82" class="title">Report</text>
-    <text x="916" y="102" class="sub">evidence and gaps</text>
-
-    <rect x="916" y="116" width="212" height="6" rx="3" fill="#1b232e"/>
-    <rect x="916" y="116" width="212" height="6" rx="3" fill="#4fd1c5" class="rail-fill"/>
-
-    <g>
-      <circle cx="920" cy="148" r="4.5" fill="#56c98a"/>
-      <text x="934" y="152" class="row">what passed</text>
-    </g>
-    <g>
-      <circle cx="920" cy="176" r="4.5" fill="#ef6a72"/>
-      <text x="934" y="180" class="row">what failed</text>
-    </g>
-    <g>
-      <circle cx="920" cy="204" r="4.5" fill="#7b8798"/>
-      <text x="934" y="208" class="row">what could not run</text>
-    </g>
-  </g>
-
-  <text x="600" y="248" class="mono" font-size="11.5" fill="#5c6878" text-anchor="middle">unavailable checks are excluded from the score</text>
 </svg>

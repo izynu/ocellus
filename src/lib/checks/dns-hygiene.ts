@@ -110,14 +110,22 @@ export const dnsHygiene: CheckDefinition = {
       const fwd = await ctx.dns.query(host, "A");
       const addresses = fwd.answers.filter((r) => r.type === 1).map((r) => r.data);
       let reverse: string | null = null;
+      // A failed lookup is not a missing record. Treating it as one fired a
+      // "mail host does not match its reverse record" finding for a check that
+      // never read the reverse record at all.
+      let reverseUnknown = false;
       if (addresses[0]) {
         const arpa = addresses[0].split(".").reverse().join(".") + ".in-addr.arpa";
         const ptr = await ctx.dns.query(arpa, "PTR");
-        reverse = ptr.answers.find((r) => r.type === 12)?.data?.replace(/\.$/, "").toLowerCase() ?? null;
+        if (ptr.failed) reverseUnknown = true;
+        else reverse = ptr.answers.find((r) => r.type === 12)?.data?.replace(/\.$/, "").toLowerCase() ?? null;
       }
+      // Marked consistent when the answer is unknown, so the finding that reads
+      // this never claims a mismatch that was never measured.
       const consistent =
-        reverse !== null &&
-        (reverse === host || reverse.endsWith(`.${domain}`) || host.endsWith(`.${reverse}`));
+        reverseUnknown ||
+        (reverse !== null &&
+          (reverse === host || reverse.endsWith(`.${domain}`) || host.endsWith(`.${reverse}`)));
       mailHosts.push({ host, addresses, reverse, consistent });
     }
 

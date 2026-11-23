@@ -489,6 +489,7 @@ export const securityHeaders: CheckDefinition = {
   question: "Which protective response headers are set, and are their values correct?",
   group: "headers",
   weight: 2,
+  needsDocument: true,
   async run(ctx): Promise<CheckResult> {
     const started = performance.now();
     const snapshot: HeaderSnapshot = await ctx.headers();

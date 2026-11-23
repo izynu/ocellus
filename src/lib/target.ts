@@ -29,9 +29,27 @@ const MULTI_LABEL_SUFFIXES = new Set([
   "co.il", "org.il", "ac.il", "gov.il",
   "com.pl", "net.pl", "org.pl", "com.ua", "org.ua", "co.at", "or.at",
   "com.es", "org.es", "nom.es", "com.pt", "com.gr", "com.ru", "com.vn",
-  "github.io", "pages.dev", "netlify.app", "vercel.app", "workers.dev",
-  "web.app", "firebaseapp.com", "herokuapp.com", "blogspot.com",
-  "azurewebsites.net", "cloudfront.net", "s3.amazonaws.com",
+]);
+
+/**
+ * Hosted suffixes whose registrable domain is four labels: a customer, then the
+ * service's own two or three labels. `user.github.io` is one site, so it must
+ * not share a registrable domain with `github.io` itself, which is why these
+ * sit in their own set rather than in the suffix set above.
+ */
+const HOSTED_SUFFIXES = new Set([
+  "s3.amazonaws.com",
+  "github.io",
+  "pages.dev",
+  "netlify.app",
+  "vercel.app",
+  "workers.dev",
+  "web.app",
+  "firebaseapp.com",
+  "herokuapp.com",
+  "blogspot.com",
+  "azurewebsites.net",
+  "cloudfront.net",
 ]);
 
 export class InvalidTarget extends Error {
@@ -119,21 +137,20 @@ export function isSameSite(host: string, target: Target): boolean {
   return h === t || h.endsWith("." + t);
 }
 
-/** True when the host is exactly the scanned host. */
-export function isSameHost(host: string, target: Target): boolean {
-  return host.toLowerCase() === target.host.toLowerCase();
-}
-
 /** eTLD+1, best-effort. Returns the input when it is already short enough. */
 export function registrableDomain(host: string): string {
   const labels = host.split(".");
   if (labels.length <= 2) return host;
+
+  const lastThree = labels.slice(-3).join(".");
+  if (HOSTED_SUFFIXES.has(lastThree)) {
+    // A four-label hosted domain, e.g. user.github.io. The apex itself
+    // (github.io) is the suffix, not a site, so it is returned unchanged
+    // rather than trimmed to nothing.
+    return labels.length >= 4 ? labels.slice(-4).join(".") : host;
+  }
+
   const lastTwo = labels.slice(-2).join(".");
   if (MULTI_LABEL_SUFFIXES.has(lastTwo)) return labels.slice(-3).join(".");
   return lastTwo;
-}
-
-/** A URL that is safe to show and to log: no credentials, no query. */
-export function displayUrl(target: Target): string {
-  return target.url.replace(/^https?:\/\//, "");
 }

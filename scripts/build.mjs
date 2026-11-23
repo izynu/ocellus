@@ -13,7 +13,7 @@
  * this runs the compiler twice rather than rewriting paths afterwards.
  *
  * Env:
- *   NEXT_PUBLIC_SITE_URL   canonical origin, e.g. https://ocellus.zynu.me
+ *   NEXT_PUBLIC_SITE_URL   canonical origin, e.g. https://izynu.github.io
  *   OC_PAGES_BASE          basePath for the Pages build, default "/ocellus"
  */
 
@@ -56,7 +56,9 @@ function buildOnce({ basePath, siteUrl, outDir }) {
 }
 
 function cpanelSiteUrl() {
-  return (process.env.NEXT_PUBLIC_SITE_URL || "https://ocellus.zynu.me").replace(/\/$/, "");
+  // Only used by the optional cPanel target. The default is the GitHub Pages
+  // origin so a bare `build:cpanel` without env still produces a valid site.
+  return (process.env.NEXT_PUBLIC_SITE_URL || "https://izynu.github.io").replace(/\/$/, "");
 }
 
 function pagesSiteUrl() {
@@ -87,6 +89,17 @@ function buildPages() {
   // GitHub Pages runs Jekyll unless told not to, and Jekyll drops paths that
   // start with an underscore, which breaks Next's _next/ asset directory.
   writeFileSync(join(outDir, ".nojekyll"), "");
+
+  // A custom domain is set by a CNAME file at the root of what Pages serves.
+  // It is written here rather than committed to public/ so it can never be
+  // copied into the cPanel deploy, where a stray CNAME file would be a dead
+  // file at the document root. Empty or unset OC_PAGES_CNAME means the Pages
+  // site stays on its github.io host.
+  const cname = (process.env.OC_PAGES_CNAME || "").trim();
+  if (cname) {
+    writeFileSync(join(outDir, "CNAME"), `${cname}\n`);
+    console.log(`pages: custom domain ${cname}`);
+  }
   console.log(`pages: base path ${PAGES_BASE}`);
 }
 
@@ -161,7 +174,14 @@ ErrorDocument 404 /404.html
   Header always set Cross-Origin-Resource-Policy "same-origin"
   # Next's static export uses inline bootstrap scripts, so 'unsafe-inline' is
   # required for script-src. Everything else is locked to this origin.
-  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://dns.google https://cloudflare-dns.com https://crt.sh https://api.hackertarget.com https://r.jina.ai https://api.microlink.io https://internetdb.shodan.io https://ipwho.is https://otx.alienvault.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests"
+  # The scan is the whole point of the page, so connect-src has to permit every
+  # source a check queries, plus the RDAP bootstrap's per-registry redirect
+  # targets (which are a different host for every TLD and cannot be enumerated
+  # in advance). Enumerating them was the earlier defect: the list named ten
+  # origins while the checks used twenty-three, so most of a scan failed on the
+  # cPanel target with no visible cause. Everything except connect-src stays
+  # locked to this origin.
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests"
   # Hashed assets never change under the same name, so cache them hard.
   <FilesMatch "\\.(js|css|woff2|png|svg|ico)$">
     Header set Cache-Control "public, max-age=31536000, immutable"

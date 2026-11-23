@@ -1,0 +1,393 @@
+/*
+ * Print and PDF styling for the Ocellus report.
+ *
+ * The screen report is built from boxes, glass and disclosure controls, which
+ * are the right tools on a screen and the wrong ones on paper. So print does not
+ * restyle the screen report: it hides it and shows a separate, paper-first
+ * document rendered by `PrintReport`. This file only decides which of the two
+ * exists in each medium and how the printed one lays out.
+ *
+ * Colour is kept, because a status rail is the fastest way to find a failure in
+ * a printed appendix, but it is confined to a 3px left border on each row so it
+ * survives greyscale. Everything else is black on white.
+ */
+
+/* ------------------------------------------------------------------ screen -- */
+
+/*
+ * The print document is inert on screen. It is in the DOM so the browser has it
+ * at the moment `window.print()` is called, but it must never be visible, read
+ * by a screen reader, or reachable by the keyboard in that mode.
+ */
+@media screen {
+  .print-doc {
+    display: none !important;
+  }
+}
+
+/* ------------------------------------------------------------------- paper -- */
+
+@page {
+  size: A4;
+  margin: 16mm 14mm;
+}
+
+@media print {
+  /* Keep status colour where it is used, and drop it everywhere it is not. */
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    animation: none !important;
+    transition: none !important;
+  }
+
+  /*
+   * The white-paper reset applies only to a page that actually carries a print
+   * document. Applying it sitewide made every other page print white text on
+   * white, because the screen theme is dark; those pages now print as they
+   * look, which is legible, and the scan report gets its own sheet.
+   */
+  body:has(.print-doc) {
+    background: #ffffff !important;
+    color: #111111 !important;
+    font-size: 10.5pt;
+    line-height: 1.45;
+  }
+
+  /* Nothing but the report goes on the sheet. The site chrome is removed, but
+     only outside the print document: it uses its own <header> and <footer> for
+     the cover and the provenance block, and those must survive. */
+  .scene,
+  .skip-link,
+  form,
+  .btn,
+  main > .container-page > h1,
+  /* The scan page's one-line summary under the form. Scoped to the scan
+     workspace so it cannot hide a tabular paragraph on any other page. */
+  .scan-summary {
+    display: none !important;
+  }
+
+  .print-doc header,
+  .print-doc footer {
+    display: block !important;
+  }
+
+  body > header,
+  body > footer,
+  .print-doc ~ header,
+  .print-doc ~ footer {
+    display: none !important;
+  }
+
+  .container-page {
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* The interactive report is replaced wholesale by the print document. */
+  .screen-doc {
+    display: none !important;
+  }
+
+  .print-doc {
+    display: block !important;
+    color: #111111;
+  }
+
+  /* --- typography --- */
+
+  .print-doc h1,
+  .print-doc h2,
+  .print-doc h3,
+  .print-doc h4 {
+    color: #111111;
+    break-after: avoid;
+    page-break-after: avoid;
+    letter-spacing: 0;
+  }
+
+  .print-doc h1 {
+    font-size: 20pt;
+    margin: 0 0 4pt;
+  }
+
+  .print-doc h2 {
+    font-size: 13pt;
+    margin: 16pt 0 6pt;
+    padding-bottom: 3pt;
+    border-bottom: 1.5pt solid #111111;
+  }
+
+  .print-doc h3 {
+    font-size: 11pt;
+    margin: 11pt 0 4pt;
+  }
+
+  .print-doc h4 {
+    font-size: 10pt;
+    margin: 8pt 0 3pt;
+  }
+
+  .print-doc p {
+    margin: 0 0 5pt;
+    orphans: 3;
+    widows: 3;
+  }
+
+  .print-doc .muted {
+    color: #555555;
+  }
+
+  .print-doc .mono {
+    font-family: var(--font-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+    font-size: 9pt;
+    word-break: break-all;
+  }
+
+  /* --- cover --- */
+
+  .print-cover {
+    break-after: page;
+    page-break-after: always;
+    padding-top: 4mm;
+  }
+
+  .print-cover__rule {
+    border: 0;
+    border-top: 2pt solid #111111;
+    margin: 8pt 0 14pt;
+  }
+
+  .print-cover__meta {
+    display: grid;
+    grid-template-columns: 34mm 1fr;
+    gap: 3pt 8pt;
+    margin: 0 0 14pt;
+    font-size: 10pt;
+  }
+
+  .print-cover__meta dt {
+    color: #555555;
+  }
+
+  .print-cover__meta dd {
+    margin: 0;
+    word-break: break-all;
+  }
+
+  .print-score {
+    display: inline-block;
+    border: 1.5pt solid #111111;
+    padding: 8pt 14pt;
+    margin: 4pt 0 8pt;
+  }
+
+  .print-score__number {
+    font-size: 30pt;
+    font-weight: 700;
+    line-height: 1;
+    margin-right: 10pt;
+  }
+
+  .print-score__grade {
+    font-size: 13pt;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .print-verdict {
+    font-size: 12pt;
+    font-weight: 600;
+    margin-top: 4pt;
+  }
+
+  /* --- tables --- */
+
+  .print-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 4pt 0 10pt;
+    font-size: 10pt;
+  }
+
+  .print-table th,
+  .print-table td {
+    border: 1pt solid #999999;
+    padding: 3pt 5pt;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .print-table th {
+    background: #eeeeee;
+    font-weight: 600;
+  }
+
+  .print-table td.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .print-kv {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 3pt 0 6pt;
+    font-size: 9.5pt;
+  }
+
+  .print-kv th,
+  .print-kv td {
+    border-bottom: 0.5pt solid #cccccc;
+    padding: 2pt 5pt;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .print-kv th {
+    width: 36mm;
+    color: #555555;
+    font-weight: 400;
+  }
+
+  /* --- sections and page breaks --- */
+
+  .print-section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-finding {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin: 0 0 9pt;
+    padding: 0 0 0 7pt;
+    border-left: 2pt solid #bbbbbb;
+  }
+
+  /* --- checks, with the status as a greyscale-safe rail --- */
+
+  .print-check {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin: 0 0 8pt;
+    padding: 3pt 0 3pt 7pt;
+    border-left: 3pt solid #999999;
+  }
+
+  .print-check--pass { border-left-color: #14794a; }
+  .print-check--warn { border-left-color: #92610a; }
+  .print-check--fail { border-left-color: #b32630; }
+  .print-check--info { border-left-color: #1b5f9e; }
+  .print-check--unavailable,
+  .print-check--skipped { border-left-color: #6b7686; }
+
+  .print-check__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8pt;
+  }
+
+  .print-check__status {
+    font-size: 8pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+  }
+
+  .print-check--pass .print-check__status { color: #14794a; }
+  .print-check--warn .print-check__status { color: #92610a; }
+  .print-check--fail .print-check__status { color: #b32630; }
+  .print-check--info .print-check__status { color: #1b5f9e; }
+  .print-check--unavailable .print-check__status,
+  .print-check--skipped .print-check__status { color: #6b7686; }
+
+  .print-check__title {
+    font-size: 10.5pt;
+    font-weight: 600;
+  }
+
+  .print-check__source {
+    font-size: 8.5pt;
+    color: #555555;
+    margin-top: 2pt;
+  }
+
+  .print-note {
+    font-size: 9pt;
+    color: #444444;
+    margin-top: 2pt;
+  }
+
+  /* --- links: print the destination, because paper cannot be clicked --- */
+
+  .print-doc a {
+    color: #111111;
+    text-decoration: none;
+    word-break: break-all;
+  }
+
+  .print-doc a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 8pt;
+    color: #555555;
+    word-break: break-all;
+  }
+
+  .print-doc a[href^="https://"]::after {
+    content: " (" attr(href) ")";
+  }
+
+  /* --- footer --- */
+
+  .print-footer {
+    margin-top: 14pt;
+    padding-top: 6pt;
+    border-top: 1pt solid #999999;
+    font-size: 8.5pt;
+    color: #444444;
+  }
+}
+
+/*
+ * A finding can carry an unbroken token: a long URL, a CSP hash, a certificate
+ * serial. On paper a token wider than the column overflows the sheet instead of
+ * wrapping, so every text-bearing element is allowed to break anywhere.
+ */
+.print-doc,
+.print-doc p,
+.print-doc li,
+.print-doc td,
+.print-doc th,
+.print-doc dd,
+.print-doc dt,
+.print-doc h1,
+.print-doc h2,
+.print-doc h3,
+.print-doc h4,
+.print-doc code,
+.print-doc a {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  min-width: 0;
+}
+
+.print-table {
+  table-layout: fixed;
+  width: 100%;
+}

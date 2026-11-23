@@ -72,6 +72,23 @@ export const popularity: CheckDefinition = {
       };
     }
 
+    // Tranco returns {ranks:[...]} for a known domain and a body with no ranks
+    // array is a malformed or changed response, not a domain outside the list.
+    if (!Array.isArray(res.json.ranks)) {
+      return {
+        id: this.id,
+        title: this.title,
+        question: this.question,
+        status: "unavailable",
+        headline: "The popularity list answered with a body this check could not read.",
+        findings: [],
+        data: { rank: null, bucket: "unavailable", rankDate: null, history: [], inTopMillion: false } satisfies PopularityData,
+        ms: Math.round(performance.now() - started),
+        source: "Tranco research ranking",
+        note: "An empty rank list is a real answer for an unranked domain; a body with no rank list at all is not, so no ranking verdict is claimed here.",
+      };
+    }
+
     const rows = (res.json.ranks ?? [])
       .filter(
         (r): r is { date: string; rank: number } =>

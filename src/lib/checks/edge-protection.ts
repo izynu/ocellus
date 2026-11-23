@@ -195,6 +195,7 @@ export const edgeProtection: CheckDefinition = {
   question: "Which CDN, web application firewall or reverse proxy sits in front of the origin?",
   group: "headers",
   weight: 1,
+  needsDocument: true,
   async run(ctx): Promise<CheckResult> {
     const started = performance.now();
     const snapshot: HeaderSnapshot = await ctx.headers();

@@ -347,8 +347,17 @@ export const markup: CheckDefinition = {
     }
 
     const serious = findings.filter((f) => f.severity === "critical" || f.severity === "high");
-    const status: CheckResult["status"] =
-      serious.length >= 3 ? "fail" : findings.length > 0 ? "warn" : "pass";
+    // Analysing a bot check or consent wall and reporting it as the page is a
+    // silent lie: a challenge page has no images, one input and no headings, so
+    // it scores as a clean markup sheet. When the document layer flagged an
+    // interstitial, the result is unavailable rather than a pass.
+    const status: CheckResult["status"] = page.suspectInterstitial
+      ? "unavailable"
+      : serious.length >= 3
+        ? "fail"
+        : findings.length > 0
+          ? "warn"
+          : "pass";
 
     // A fixed plural reads "across 1 images, 1 links and 1 form fields" on a
     // small page. Each count gets its own agreement.
@@ -361,8 +370,9 @@ export const markup: CheckDefinition = {
       title: this.title,
       question: this.question,
       status,
-      headline:
-        findings.length === 0
+      headline: page.suspectInterstitial
+        ? "The document read as a consent wall or bot check, so its markup is not the page's and no verdict is given."
+        : findings.length === 0
           ? `No markup or accessibility problems were found ${scope}.`
           : `${findings.length} markup issue${findings.length === 1 ? "" : "s"} ${scope}.`,
       findings,

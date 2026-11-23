@@ -65,11 +65,26 @@ export const subdomains: CheckDefinition = {
       };
     }
 
+    // crt.sh answers 200 with an HTML error page under load, and an unparseable
+    // body is not "no subdomains". Reading it as an empty list produced a clean
+    // pass for a domain whose certificate search had actually failed.
     let entries: CtEntry[];
     try {
-      entries = JSON.parse(ctRes.text) as CtEntry[];
+      const parsed: unknown = JSON.parse(ctRes.text);
+      if (!Array.isArray(parsed)) throw new Error("not an array");
+      entries = parsed as CtEntry[];
     } catch {
-      entries = [];
+      return {
+        id: this.id,
+        title: this.title,
+        question: this.question,
+        status: "unavailable",
+        headline: "The CT log index answered, but not with a readable certificate list.",
+        findings: [],
+        ms: Math.round(performance.now() - started),
+        source: "crt.sh",
+        note: "crt.sh returns an HTML error page or a truncated response when it is overloaded. Neither is an empty certificate list, so no subdomain verdict is claimed. Re-running the scan usually succeeds.",
+      };
     }
 
     const hostSet = new Set<string>();

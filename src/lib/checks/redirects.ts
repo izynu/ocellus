@@ -54,6 +54,7 @@ export const redirects: CheckDefinition = {
   question: "How many hops does the request take, and does any hop weaken the connection or change owner?",
   group: "transport",
   weight: 1,
+  needsDocument: true,
   async run(ctx): Promise<CheckResult> {
     const started = performance.now();
     const snapshot = await ctx.headers();

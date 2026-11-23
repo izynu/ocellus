@@ -79,8 +79,3 @@ export function rankFindings(checks: CheckResult[]) {
     .flatMap((check) => check.findings.map((finding) => ({ check, finding })))
     .sort((a, b) => SEVERITY_RANK[a.finding.severity] - SEVERITY_RANK[b.finding.severity]);
 }
-
-/** The fraction a single check earns on its own, for the report's per-row bar. */
-export function checkFraction(status: CheckStatus): number | null {
-  return STATUS_VALUE[status];
-}

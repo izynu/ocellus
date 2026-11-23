@@ -91,10 +91,14 @@ export async function runScan(
     ? ALL_CHECKS.filter((c) => options.only!.includes(c.id))
     : ALL_CHECKS;
 
-  // Wave one: the checks that do not need the shared document, ordered so the
-  // cheapest land first.
+  // Wave one: the checks that answer without the shared document, so the page
+  // has DNS, certificate and email results before the HTML fetch resolves.
+  // Membership is decided by `needsDocument`, not by group: the group is a
+  // proxy, and a headers or transport check that reads the shared header
+  // snapshot would otherwise start here and stall the whole first wave behind
+  // one fetch.
   const waveOne = selected
-    .filter((c) => c.group === "dns" || c.group === "headers" || c.group === "transport")
+    .filter((c) => !c.needsDocument && (c.group === "dns" || c.group === "headers" || c.group === "transport"))
     .sort((a, b) => a.weight - b.weight);
   const waveTwo = selected
     .filter((c) => !waveOne.includes(c))
@@ -103,46 +107,54 @@ export async function runScan(
   const results: CheckResult[] = [];
   options.onProgress?.({ kind: "start", target, total: selected.length });
 
-  const runOne = async (def: CheckDefinition): Promise<CheckResult> => {
+  const aborted = () => options.signal?.aborted === true;
+
+  const runOne = async (def: CheckDefinition): Promise<CheckResult | null> => {
     const timeoutMs = options.checkTimeoutMs ?? DEFAULT_CHECK_TIMEOUT;
+    let result: CheckResult;
     try {
-      const result = await withTimeout(def.run(ctx), timeoutMs, def);
-      results.push(result);
-      options.onProgress?.({
-        kind: "check",
-        result,
-        done: results.length,
-        total: selected.length,
-      });
-      return result;
+      result = await withTimeout(def.run(ctx), timeoutMs, def);
     } catch (err) {
-      const failed = failureResult(def, err);
-      results.push(failed);
-      options.onProgress?.({
-        kind: "check",
-        result: failed,
-        done: results.length,
-        total: selected.length,
-      });
-      return failed;
+      result = failureResult(def, err);
     }
+    // A check that resolves after the visitor cancelled is not part of this
+    // scan. Pushing it changed `done` past `total` and could emit a progress
+    // event that made a cancelled run look like it was still working.
+    if (aborted()) return null;
+    // A result whose id is missing or wrong would be dropped by the registry
+    // match below and silently vanish from the report. Stamping the id the
+    // runner asked for makes the result impossible to lose.
+    if (result.id !== def.id) result = { ...result, id: def.id };
+    results.push(result);
+    options.onProgress?.({
+      kind: "check",
+      result,
+      done: results.length,
+      total: selected.length,
+    });
+    return result;
   };
 
   // Two concurrent checks per wave keeps upstreams calm while still finishing a
   // sixteen-check scan in a reasonable time. The NetClient gate is the real
   // limiter; this just prevents every check from starting at once.
   await runPool(waveOne, 3, runOne);
-  await runPool(waveTwo, 3, runOne);
+  if (!aborted()) await runPool(waveTwo, 3, runOne);
 
   const finishedAt = new Date();
   const weights: Record<string, number> = {};
   for (const def of ALL_CHECKS) weights[def.id] = def.weight;
 
   // Report order follows the registry, not completion order, so the page does
-  // not reshuffle between runs.
-  const ordered = ALL_CHECKS.filter((def) => results.some((r) => r.id === def.id)).map(
-    (def) => results.find((r) => r.id === def.id)!
-  );
+  // not reshuffle between runs. The registry is also what the report is built
+  // from, so a result can never be dropped for having an unexpected id: any
+  // result not in the registry is appended rather than discarded.
+  const byId = new Map(results.map((r) => [r.id, r]));
+  const known = new Set(ALL_CHECKS.map((def) => def.id));
+  const ordered = [
+    ...ALL_CHECKS.filter((def) => byId.has(def.id)).map((def) => byId.get(def.id)!),
+    ...results.filter((r) => !known.has(r.id)),
+  ];
 
   const { score, grade } = scoreChecks(ordered, weights);
 
@@ -233,11 +245,51 @@ export function saveReport(report: ScanReport): void {
   }
 }
 
+/**
+ * True when a parsed value has the shape the report layer reads. A restored
+ * report is data from an earlier build, and a missing or renamed field would
+ * throw inside render and blank the page. Anything that fails this test is
+ * discarded, so the worst outcome of a stale entry is no restored report.
+ */
+function isScanReport(value: unknown): value is ScanReport {
+  if (!value || typeof value !== "object") return false;
+  const report = value as Partial<ScanReport>;
+  return (
+    typeof report.target?.host === "string" &&
+    typeof report.target?.url === "string" &&
+    typeof report.score === "number" &&
+    Number.isFinite(report.score) &&
+    typeof report.grade === "string" &&
+    (report.grade === "A" ||
+      report.grade === "B" ||
+      report.grade === "C" ||
+      report.grade === "D" ||
+      report.grade === "E" ||
+      report.grade === "F") &&
+    Array.isArray(report.checks) &&
+    report.checks.every(
+      (check) =>
+        check &&
+        typeof check.id === "string" &&
+        typeof check.title === "string" &&
+        typeof check.status === "string" &&
+        Array.isArray(check.findings)
+    )
+  );
+}
+
 export function loadReport(): ScanReport | null {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw) as ScanReport;
+    const parsed: unknown = JSON.parse(raw);
+    if (!isScanReport(parsed)) {
+      // A report from an older build that no longer matches. Clearing it means
+      // the next render never receives a shape it cannot read.
+      clearReport();
+      return null;
+    }
+    return parsed;
   } catch {
     return null;
   }

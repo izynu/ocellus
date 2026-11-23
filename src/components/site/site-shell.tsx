@@ -38,13 +38,13 @@ function Wordmark() {
 
 function NavLinks() {
   return (
-    <nav aria-label="Primary" className="hidden items-center gap-1 md:flex">
+    <nav aria-label="Primary" className="hidden items-center gap-0.5 md:flex">
       {ROUTES.filter((r) => r.href !== "/").map((r) => (
         <Link
           key={r.href}
           href={r.href}
           className="btn btn-ghost btn-sm"
-          style={{ fontWeight: 500 }}
+          style={{ fontWeight: 500, paddingInline: 10 }}
         >
           {r.label}
         </Link>
@@ -54,17 +54,19 @@ function NavLinks() {
 }
 
 /**
- * Site header. Glass, because it floats over the scene and content scrolls
- * beneath it. Sticky rather than fixed so it never covers the top of a page.
+ * Site header. Liquid glass, because it floats over the scene and content
+ * scrolls beneath it. Sticky rather than fixed so it never covers the top of a
+ * page. The blur and the hairline are the whole effect: nothing moves, nothing
+ * follows the pointer.
  */
 export function SiteHeader() {
   return (
     <header
-      className="sticky top-0 z-40"
+      className="sticky top-0 z-40 glass--liquid"
       style={{
-        background: "color-mix(in oklab, var(--background) 72%, transparent)",
-        backdropFilter: "blur(18px) saturate(1.3)",
-        WebkitBackdropFilter: "blur(18px) saturate(1.3)",
+        background: "color-mix(in oklab, var(--background) 74%, transparent)",
+        backdropFilter: "blur(20px) saturate(1.4)",
+        WebkitBackdropFilter: "blur(20px) saturate(1.4)",
         borderBottom: "1px solid var(--border)",
       }}
     >
@@ -78,13 +80,20 @@ export function SiteHeader() {
           </Link>
         </div>
       </div>
-      {/* Below the breakpoint the nav collapses to a single row of links. */}
-      <div className="container-page flex gap-1 overflow-x-auto pb-2 md:hidden">
-        {ROUTES.filter((r) => r.href !== "/").map((r) => (
-          <Link key={r.href} href={r.href} className="btn btn-ghost btn-sm">
-            {r.label}
-          </Link>
-        ))}
+      {/* Below the breakpoint the nav collapses to a scrollable dock row. */}
+      <div className="container-page md:hidden" style={{ paddingBottom: 10 }}>
+        <nav aria-label="Sections" className="dock flex gap-1 overflow-x-auto p-1">
+          {ROUTES.filter((r) => r.href !== "/").map((r) => (
+            <Link
+              key={r.href}
+              href={r.href}
+              className="btn btn-ghost btn-sm"
+              style={{ flex: "none" }}
+            >
+              {r.label}
+            </Link>
+          ))}
+        </nav>
       </div>
     </header>
   );
@@ -105,18 +114,18 @@ export function SiteFooter() {
             </p>
           </div>
 
-          <div className="flex gap-14">
+          <div className="flex flex-wrap gap-x-14 gap-y-8">
             <nav aria-label="Product" className="flex flex-col gap-2.5">
               <span className="eyebrow">Product</span>
-              {ROUTES.map((r) => (
+              {ROUTES.slice(0, 5).map((r) => (
                 <Link key={r.href} href={r.href} style={{ fontSize: 14, color: "var(--muted-foreground)" }}>
                   {r.label}
                 </Link>
               ))}
             </nav>
-            <nav aria-label="Legal" className="flex flex-col gap-2.5">
-              <span className="eyebrow">Legal</span>
-              {LEGAL_ROUTES.map((r) => (
+            <nav aria-label="Reference" className="flex flex-col gap-2.5">
+              <span className="eyebrow">Reference</span>
+              {ROUTES.slice(5).map((r) => (
                 <Link key={r.href} href={r.href} style={{ fontSize: 14, color: "var(--muted-foreground)" }}>
                   {r.label}
                 </Link>
@@ -129,6 +138,14 @@ export function SiteFooter() {
               >
                 Source
               </a>
+            </nav>
+            <nav aria-label="Legal" className="flex flex-col gap-2.5">
+              <span className="eyebrow">Legal</span>
+              {LEGAL_ROUTES.map((r) => (
+                <Link key={r.href} href={r.href} style={{ fontSize: 14, color: "var(--muted-foreground)" }}>
+                  {r.label}
+                </Link>
+              ))}
             </nav>
           </div>
         </div>

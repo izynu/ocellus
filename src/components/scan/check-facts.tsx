@@ -47,6 +47,8 @@ import type { SeoData } from "@/lib/checks/seo";
 import type { PerformanceData } from "@/lib/checks/performance";
 import type { CarbonData } from "@/lib/checks/carbon";
 import type { DarkPatternData } from "@/lib/checks/dark-patterns";
+import type { ReconSubdomainsData } from "@/lib/checks/recon-subdomains";
+import type { UrlScanData } from "@/lib/checks/url-scan";
 
 type Fact = {
   label: string;
@@ -815,6 +817,55 @@ function factsFor(id: string, data: unknown): Fact[] {
       ];
     }
 
+    case "recon-subdomains": {
+      const d = data as ReconSubdomainsData;
+      return [
+        { label: "Hostnames", value: d.hostnames.length.toLocaleString("en-US") },
+        {
+          label: "Sources",
+          // Both source names must show, not just the first two of a list: a
+          // reader needs to know whether one answered or both, because one
+          // answer is a partial surface and the check's note says so.
+          value: d.sourcesAnswered.length > 0 ? d.sourcesAnswered.join(", ") : "none answered",
+        },
+        {
+          label: "Look internal",
+          value: d.sensitive.length > 0 ? list(d.sensitive, 3) : "none",
+          tone: d.sensitive.length > 0 ? "tone-warn" : undefined,
+        },
+        { label: "With an address", value: String(d.withAddress.length) },
+      ];
+    }
+
+    case "url-scan": {
+      const d = data as UrlScanData;
+      const latest = d.captures[0];
+      return [
+        { label: "Address", value: <span className="mono">{d.ip ?? NONE}</span> },
+        {
+          label: "Reverse name",
+          value: d.reverseNames.length > 0 ? list(d.reverseNames, 2) : "none published",
+        },
+        {
+          label: "Shares the address",
+          value:
+            d.neighbours.length > 0
+              ? `${d.neighbours.length} hostname${d.neighbours.length === 1 ? "" : "s"}`
+              : "none recorded",
+        },
+        {
+          label: "Prior urlscan captures",
+          value: d.captureCount > 0 ? d.captureCount.toLocaleString("en-US") : "none",
+        },
+        ...(latest
+          ? [
+              { label: "Latest capture", value: date(latest.time) },
+              { label: "Latest title", value: latest.title },
+            ]
+          : []),
+      ];
+    }
+
     default:
       return [];
   }
@@ -825,10 +876,23 @@ function factsFor(id: string, data: unknown): Fact[] {
 /**
  * Rendered inside a check's box. Returns nothing when the check has no payload,
  * so a caller can place it unconditionally.
+ *
+ * The payload is cast per check id, which is sound when the report was produced
+ * by this build. It is not sound when the report was restored from
+ * `sessionStorage`, where a report written by an older build can carry a
+ * payload whose fields have since been renamed or dropped. One missing array
+ * would throw during render and blank the whole report, so a failed projection
+ * degrades to no fact list rather than to no report.
  */
 export function CheckFacts({ result }: { result: CheckResult }) {
   if (!result.data) return null;
-  const rows = factsFor(result.id, result.data);
+
+  let rows: Fact[];
+  try {
+    rows = factsFor(result.id, result.data);
+  } catch {
+    return null;
+  }
   if (rows.length === 0) return null;
 
   return (

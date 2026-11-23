@@ -1,78 +1,63 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" width="1200" height="420" role="img" aria-label="Ocellus: a browser-side website audit">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0b0e13"/>
-      <stop offset="1" stop-color="#0e141c"/>
-    </linearGradient>
-    <radialGradient id="poolA" cx="50%" cy="50%" r="50%">
-      <stop offset="0" stop-color="#4fd1c5" stop-opacity="0.22"/>
-      <stop offset="1" stop-color="#4fd1c5" stop-opacity="0"/>
-    </radialGradient>
-    <radialGradient id="poolB" cx="50%" cy="50%" r="50%">
-      <stop offset="0" stop-color="#5aa9e6" stop-opacity="0.16"/>
-      <stop offset="1" stop-color="#5aa9e6" stop-opacity="0"/>
-    </radialGradient>
-    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
-      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.04" stroke-width="1"/>
-    </pattern>
-    <clipPath id="frame">
-      <rect width="1200" height="420"/>
-    </clipPath>
-  </defs>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" width="1200" height="420" role="img" preserveAspectRatio="xMidYMid meet" aria-label="Ocellus, a browser-side audit of what a hostname exposes: DNS records, certificates, response headers, and the page itself, each read from a public source">
+  <title>Ocellus, a browser-side audit of one hostname</title>
 
-  <g clip-path="url(#frame)">
-    <rect width="1200" height="420" fill="url(#bg)"/>
-    <rect width="1200" height="420" fill="url(#grid)"/>
-    <ellipse cx="230" cy="40" rx="360" ry="300" fill="url(#poolA)"/>
-    <ellipse cx="1080" cy="400" rx="330" ry="280" fill="url(#poolB)"/>
+  <!-- The canvas. One solid background, one fine grid, no gradient mesh. -->
+  <rect width="1200" height="420" fill="#0b0e13"/>
+  <g stroke="#232b36" stroke-width="1" opacity="0.55">
+    <path d="M0 60 H1200 M0 120 H1200 M0 180 H1200 M0 240 H1200 M0 300 H1200 M0 360 H1200"/>
+    <path d="M60 0 V420 M120 0 V420 M180 0 V420 M240 0 V420 M300 0 V420 M360 0 V420 M420 0 V420 M480 0 V420 M540 0 V420 M600 0 V420 M660 0 V420 M720 0 V420 M780 0 V420 M840 0 V420 M900 0 V420 M960 0 V420 M1020 0 V420 M1080 0 V420 M1140 0 V420"/>
+  </g>
+  <rect x="0.5" y="0.5" width="1199" height="419" fill="none" stroke="#232b36"/>
 
-    <!-- The mark. The pupil is centred and still: an image that loops forever
-         in a README is motion for its own sake, and this one has no job. -->
-    <g transform="translate(96,104)">
-      <rect width="96" height="96" rx="21" fill="#10151c" stroke="#ffffff" stroke-opacity="0.08"/>
-      <circle cx="48" cy="48" r="29" fill="none" stroke="#4fd1c5" stroke-opacity="0.3" stroke-width="3"/>
-      <circle cx="48" cy="48" r="18.5" fill="none" stroke="#4fd1c5" stroke-width="3"/>
-      <circle cx="48" cy="48" r="7.6" fill="#4fd1c5"/>
-    </g>
-
-    <text x="96" y="268" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="66" font-weight="600" fill="#e8ecf2" letter-spacing="-2">Ocellus</text>
-    <text x="98" y="312" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="23" fill="#94a1b2">A website audit that runs in your browser.</text>
-
-    <!-- A scan resolving, left to right: the four states the report uses. -->
-    <g font-family="JetBrains Mono, SFMono-Regular, Menlo, monospace" font-size="16">
-      <g transform="translate(96,356)" opacity="1">
-        <circle cx="6" cy="-5" r="5" fill="#56c98a"/>
-        <text x="20" y="0" fill="#94a1b2">dns</text>
-      </g>
-      <g transform="translate(186,356)" opacity="1">
-        <circle cx="6" cy="-5" r="5" fill="#56c98a"/>
-        <text x="20" y="0" fill="#94a1b2">tls</text>
-      </g>
-      <g transform="translate(276,356)" opacity="1">
-        <circle cx="6" cy="-5" r="5" fill="#e0a33a"/>
-        <text x="20" y="0" fill="#94a1b2">headers</text>
-      </g>
-      <g transform="translate(396,356)" opacity="1">
-        <circle cx="6" cy="-5" r="5" fill="#ef6a72"/>
-        <text x="20" y="0" fill="#94a1b2">dmarc</text>
-      </g>
-      <g transform="translate(506,356)" opacity="1">
-        <circle cx="6" cy="-5" r="5" fill="#7b8798"/>
-        <text x="20" y="0" fill="#94a1b2">ports</text>
-      </g>
-    </g>
-
-    <!-- Right: the dial as a shape, with no number on it.
-         An earlier version showed a specific score and grade. That was a made-up
-         result sitting in the first image anyone sees, which is the one thing a
-         measurement tool must never do. The dial keeps its form and drops the
-         claim. -->
-    <g transform="translate(940,210)">
-      <circle r="86" fill="none" stroke="#ffffff" stroke-opacity="0.07" stroke-width="10"/>
-      <circle r="86" fill="none" stroke="#4fd1c5" stroke-opacity="0.55" stroke-width="10" stroke-linecap="round"
-              stroke-dasharray="118 422" stroke-dashoffset="0" transform="rotate(-90)"/>
-      <text x="0" y="6" text-anchor="middle" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="30" font-weight="600" fill="#e8ecf2">score</text>
-      <text x="0" y="32" text-anchor="middle" font-family="JetBrains Mono, Menlo, monospace" font-size="13" fill="#94a1b2">weighted</text>
+  <!-- Left: the mark. An ocellus is a simple eye: one lens that resolves light
+       and dark. Drawn as a filled pupil inside two concentric rings. -->
+  <g transform="translate(150 210)">
+    <circle r="104" fill="none" stroke="#232b36" stroke-width="1.5"/>
+    <circle r="78" fill="none" stroke="#4fd1c5" stroke-opacity="0.38" stroke-width="1.5"/>
+    <circle r="52" fill="none" stroke="#4fd1c5" stroke-opacity="0.7" stroke-width="1.5"/>
+    <circle r="26" fill="#4fd1c5"/>
+    <circle r="26" fill="none" stroke="#8ff0e6" stroke-opacity="0.55" stroke-width="1"/>
+    <!-- Four tick marks on the outer ring, at the diagonals. -->
+    <g stroke="#4fd1c5" stroke-opacity="0.5" stroke-width="1.5">
+      <path d="M-104 0 L-92 0 M92 0 L104 0 M0 -104 L0 -92 M0 92 L0 104"/>
     </g>
   </g>
+
+  <!-- Right: the wordmark and the one-line statement. -->
+  <g font-family="Inter, ui-sans-serif, system-ui, sans-serif">
+    <text x="330" y="150" fill="#e8ecf2" font-size="52" font-weight="600" letter-spacing="-1.4">Ocellus</text>
+    <text x="330" y="192" fill="#94a1b2" font-size="19" letter-spacing="0.2">A browser-side audit of what a hostname exposes.</text>
+    <text x="330" y="220" fill="#6f7c8d" font-size="16">32 checks. 12 groups. No server, no account, no API key.</text>
+  </g>
+
+  <!-- The four layers the audit reads, in order, as a short strip. -->
+  <g font-family="Inter, ui-sans-serif, system-ui, sans-serif" transform="translate(330 258)">
+    <g>
+      <rect x="0" y="0" width="188" height="66" rx="10" fill="#10151c" stroke="#232b36"/>
+      <circle cx="20" cy="22" r="4" fill="#5aa9e6"/>
+      <text x="34" y="27" fill="#e8ecf2" font-size="14" font-weight="600">Name system</text>
+      <text x="14" y="50" fill="#94a1b2" font-size="12">DNS, DNSSEC, WHOIS</text>
+    </g>
+    <g transform="translate(204 0)">
+      <rect x="0" y="0" width="188" height="66" rx="10" fill="#10151c" stroke="#232b36"/>
+      <circle cx="20" cy="22" r="4" fill="#5aa9e6"/>
+      <text x="34" y="27" fill="#e8ecf2" font-size="14" font-weight="600">Certificates</text>
+      <text x="14" y="50" fill="#94a1b2" font-size="12">CT logs, revocation</text>
+    </g>
+    <g transform="translate(408 0)">
+      <rect x="0" y="0" width="188" height="66" rx="10" fill="#10151c" stroke="#232b36"/>
+      <circle cx="20" cy="22" r="4" fill="#5aa9e6"/>
+      <text x="34" y="27" fill="#e8ecf2" font-size="14" font-weight="600">Headers</text>
+      <text x="14" y="50" fill="#94a1b2" font-size="12">CSP, HSTS, cookies</text>
+    </g>
+    <g transform="translate(612 0)">
+      <rect x="0" y="0" width="188" height="66" rx="10" fill="#10151c" stroke="#232b36"/>
+      <circle cx="20" cy="22" r="4" fill="#5aa9e6"/>
+      <text x="34" y="27" fill="#e8ecf2" font-size="14" font-weight="600">The page</text>
+      <text x="14" y="50" fill="#94a1b2" font-size="12">Markup, privacy, SEO</text>
+    </g>
+  </g>
+
+  <!-- Bottom rule: the honesty statement, in the muted colour, not a slogan. -->
+  <text x="330" y="366" font-family="Inter, ui-sans-serif, system-ui, sans-serif" fill="#6f7c8d" font-size="13">Every value is what a named public source returned, or an explicit statement that it could not be reached.</text>
 </svg>

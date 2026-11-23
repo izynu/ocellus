@@ -95,7 +95,35 @@ export type CheckGroup =
   | "seo"
   | "infrastructure"
   | "threat"
-  | "ux";
+  | "ux"
+  | "recon";
+
+/** The reference categories a dork belongs to, used by the dork catalogue page. */
+export type DorkCategory = "exposure" | "login" | "error" | "content" | "infra" | "leaks";
+
+/**
+ * How Ocellus relates to a third-party scanner: it answers the same question in
+ * the browser (`native`), or it does not, and the row says what it cannot do
+ * (`reference`).
+ */
+export type ToolCoverage = "native" | "reference";
+
+/** One step of the published recon workflow, and whether a page can run it. */
+export type ReconPhase = {
+  id: string;
+  title: string;
+  question: string;
+  /** True when an Ocellus check carries this step out in the browser. */
+  inBrowser: boolean;
+  /** Check ids that implement the step, when there are any. */
+  checks: string[];
+  /** Named tools for the step, whether or not Ocellus replaces them. */
+  tools: string[];
+  body: string;
+  /** Where the phrasing of the step comes from. */
+  source: string;
+  sourceUrl: string;
+};
 
 export type CheckDefinition = {
   id: string;
@@ -105,6 +133,15 @@ export type CheckDefinition = {
   /** Rough cost, used to order the queue: cheap checks report first. */
   weight: 1 | 2 | 3;
   run: (ctx: ScanContext) => Promise<CheckResult>;
+  /**
+   * True when the check reads the target's HTML or response headers, which are
+   * fetched once and shared. The runner uses this, not the group, to decide
+   * which wave a check starts in: a check that waits on the shared fetch must
+   * not sit in the first wave, or every later wave-one result is delayed behind
+   * it. Defaults to false when omitted, so a header-only or DNS-only check
+   * needs no annotation.
+   */
+  needsDocument?: boolean;
 };
 
 export type ScanContext = {

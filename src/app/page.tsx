@@ -41,6 +41,8 @@ const GROUP_NOTE: Record<CheckGroup, string> = {
   threat:
     "Threat intelligence that names the domain, whether a filtering resolver refuses to resolve it, how widely it is seen in traffic, and whether the operator has appeared in a disclosed breach.",
   ux: "Interface patterns that obstruct or mislead a person, as far as they can be read from markup alone.",
+  recon:
+    "The reconnaissance layer: passive-DNS hostnames under the domain, the address behind the host and what else shares it, reverse DNS, and prior public scans of the URL.",
 };
 
 const STATUSES = [
@@ -88,16 +90,38 @@ const STEPS = [
   },
 ];
 
+/** The three entry points, described in one sentence each. */
+const PART_LINKS = [
+  {
+    href: "/scan",
+    title: "Scan a hostname",
+    body: "Run every check against one address and read the grouped report, with each finding kept in its own area.",
+    meta: "Measurement",
+  },
+  {
+    href: "/recon",
+    title: "Recon methodology",
+    body: "The eight-step workflow behind the scan, with each step marked as either run in the browser or requiring a terminal.",
+    meta: "Methodology",
+  },
+  {
+    href: "/dorks",
+    title: "Dork catalogue",
+    body: "Search-engine queries for the target, generated for you and opened in your own browser. Neither runs nor records them.",
+    meta: "Reference",
+  },
+];
+
 export default function HomePage() {
   return (
     <SiteShell>
       <div className="container-page">
       {/* ---------------------------------------------------------- opening -- */}
       <section className="rise pt-14 pb-4 md:pt-24">
-        <p className="eyebrow">Website audit</p>
+        <p className="eyebrow">Website audit and recon</p>
         <h1
           className="mt-4"
-          style={{ fontSize: "clamp(2.1rem, 5.4vw, 3.4rem)", maxWidth: "19ch" }}
+          style={{ fontSize: "clamp(2.1rem, 5.4vw, 3.4rem)", maxWidth: "20ch" }}
         >
           What a hostname gives away, measured from public sources.
         </h1>
@@ -106,8 +130,9 @@ export default function HomePage() {
           style={{ fontSize: 17.5, maxWidth: "58ch", color: "var(--muted-foreground)" }}
         >
           Ocellus runs {checks.length} fixed checks against one hostname, using public data
-          sources that your browser queries directly. It reports what each source answered and
-          keeps what it could not reach separate from what it measured.
+          sources that your browser queries directly. It reports what each source answered, groups
+          the findings by area so they never blur together, and keeps what it could not reach
+          separate from what it measured.
         </p>
 
         {/*
@@ -140,6 +165,38 @@ export default function HomePage() {
           {checks.length} checks. No account, and no server of ours in between: your browser queries
           each public source directly.
         </p>
+      </section>
+
+      {/* --------------------------------------------------- the three parts -- */}
+      <section className="mt-14 md:mt-20" aria-labelledby="parts">
+        <h2 id="parts" style={{ fontSize: 24 }}>
+          Three ways in
+        </h2>
+        <p
+          className="mt-3"
+          style={{ fontSize: 15, maxWidth: "62ch", color: "var(--muted-foreground)" }}
+        >
+          The scan is the measurement. The recon and dork pages are the methodology behind it,
+          written down so you can run the parts a browser cannot.
+        </p>
+        <ul className="box-grid box-grid--wide mt-7">
+          {PART_LINKS.map((part, index) => (
+            <li key={part.href} className="box box--raised rise" style={{ ["--i" as string]: index }}>
+              <div className="box__head">
+                <span className="dot tone-info" aria-hidden="true" />
+                <h3 className="box__title">
+                  <Link href={part.href} style={{ color: "var(--foreground)" }}>
+                    {part.title}
+                  </Link>
+                </h3>
+              </div>
+              <p className="box__body">{part.body}</p>
+              <div className="box__meta">
+                <span className="tabular">{part.meta}</span>
+              </div>
+            </li>
+          ))}
+        </ul>
       </section>
 
       {/* -------------------------------------------------- what it measures -- */}
@@ -289,7 +346,9 @@ export default function HomePage() {
             The <Link href="/method">method page</Link> names every source, reproduces the
             scoring formula and its grade bands, and lists the specifications each finding is
             judged against. The <Link href="/checks">check catalogue</Link> lists every check,
-            the question it asks and the weight it carries in the score.
+            the question it asks and the weight it carries in the score. The{" "}
+            <Link href="/scanners">scanner coverage</Link> page names the tools that answer the
+            same questions, so you can see where this product stops.
           </p>
         </div>
       </section>

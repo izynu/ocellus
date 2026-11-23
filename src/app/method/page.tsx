@@ -140,6 +140,24 @@ const SOURCES = [
     how: "Keyless estimator endpoint. The figure is a model's estimate, not a measurement of this scan's transfer, and it is never treated as a defect.",
   },
   {
+    name: "api.subdomain.center",
+    href: "https://api.subdomain.center/",
+    what: "Hostnames passive DNS has recorded under the domain. Read through the reader because the endpoint sends no CORS header.",
+    how: "Keyless JSON endpoint. Used by the subdomain enumeration check, which treats the list as a lower bound.",
+  },
+  {
+    name: "HackerTarget host search, reverse DNS and reverse IP",
+    href: "https://hackertarget.com/",
+    what: "Hostnames recorded for a domain, the reverse name of the host, and the other hostnames on the same address.",
+    how: "Keyless plain-text endpoints that send CORS headers. Rate limited by IP.",
+  },
+  {
+    name: "urlscan.io",
+    href: "https://urlscan.io/",
+    what: "Prior public scans of the domain, with the page's own title, server and country from another party's request.",
+    how: "Public search index, read through the reader because the endpoint sends no CORS header. A capture is context, never a verdict.",
+  },
+  {
     name: "The document's own markup",
     href: "https://www.w3.org/TR/WCAG22/",
     what: "Headings, alternative text, form labels, language, duplicate identifiers, canonical and robots directives, script and iframe sources.",
@@ -298,7 +316,7 @@ export default function MethodPage() {
           If no check produced a verdict, the score is 0 and the grade is F, and the report says
           that nothing could be measured.
         </p>
-        <ul className="box-grid not-prose mt-4">
+        <ul className="box-grid mt-4">
           {FRACTIONS.map((row, index) => (
             <li
               key={row.status}
@@ -319,7 +337,7 @@ export default function MethodPage() {
           The resulting score maps to a grade by fixed bands. There are no curves, no
           per-site adjustments and no hidden bonuses.
         </p>
-        <ul className="box-grid not-prose mt-4">
+        <ul className="box-grid mt-4">
           {GRADES.map((row, index) => (
             <li key={row.grade} className="box rise" style={{ ["--i" as string]: index }}>
               <div className="flex items-baseline justify-between gap-3">

@@ -14,12 +14,13 @@
  */
 
 import { Download, Printer } from "lucide-react";
-import type { CheckGroup, CheckResult, ScanReport } from "@/lib/types";
+import type { CheckGroup, CheckResult, Finding, ScanReport } from "@/lib/types";
 import { rankFindings } from "@/lib/scan/score";
 import { GROUP_LABEL, GROUP_ORDER, groupOf } from "@/lib/checks";
 import { CheckDetail, FindingRow, statusLabel, statusTone } from "./check-detail";
 import { CheckFacts } from "./check-facts";
 import { ScoreRing } from "./score-ring";
+import { PrintReport } from "./print-report";
 
 /** Plain-English reading of the score. Bands match the published grade cut-offs. */
 function verdictFor(score: number): string {
@@ -140,9 +141,10 @@ function HeaderRow({ report }: { report: ScanReport }) {
           type="button"
           className="btn btn-quiet btn-sm"
           onClick={() => window.print()}
+          title="Opens the print dialog. Choose Save as PDF there to keep a copy, or print to paper."
         >
           <Printer size={15} aria-hidden="true" />
-          Print
+          Export PDF
         </button>
       </div>
     </header>
@@ -246,6 +248,23 @@ function FindingsSection({ report }: { report: ScanReport }) {
   const ranked = rankFindings(report.checks);
   const aboveInfo = ranked.filter((entry) => entry.finding.severity !== "info");
 
+  // Findings are grouped by the area they came from, never pooled into one
+  // ranked list. A mixed list puts a certificate note beside a cookie note and
+  // asks a reader to hold both in mind; grouped by area, each section is a
+  // self-contained answer to one question about the site.
+  const byArea = new Map<CheckGroup, Array<{ check: CheckResult; finding: Finding }>>();
+  for (const entry of ranked) {
+    const group = groupFor(entry.check);
+    if (!group) continue;
+    const list = byArea.get(group) ?? [];
+    list.push(entry);
+    byArea.set(group, list);
+  }
+  const areaSections = GROUP_ORDER.filter((group) => byArea.has(group)).map((group) => ({
+    group,
+    entries: byArea.get(group)!,
+  }));
+
   return (
     <section aria-labelledby="findings-heading" style={{ marginTop: 30 }}>
       <div className="flex items-baseline justify-between gap-4">
@@ -264,16 +283,32 @@ function FindingsSection({ report }: { report: ScanReport }) {
         </p>
       ) : null}
 
-      {ranked.length > 0 && (
-        <ul
-          className="divide-y divide-border"
-          style={{ marginTop: 8, listStyle: "none", padding: 0 }}
+      {areaSections.map(({ group, entries }) => (
+        <section
+          key={group}
+          className={`area-${group}`}
+          style={{ marginTop: 22 }}
+          aria-label={GROUP_LABEL[group]}
         >
-          {ranked.map(({ check, finding }) => (
-            <FindingRow key={`${check.id}-${finding.id}`} finding={finding} />
-          ))}
-        </ul>
-      )}
+          <div className="flex flex-wrap items-baseline justify-between gap-3">
+            <div className="area-head">
+              <span className="dot" aria-hidden="true" />
+              <h4 style={{ fontSize: 14.5, fontWeight: 600 }}>{GROUP_LABEL[group]}</h4>
+            </div>
+            <span className="tabular" style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
+              {entries.length} finding{entries.length === 1 ? "" : "s"}
+            </span>
+          </div>
+          <ul
+            className="divide-y divide-border"
+            style={{ marginTop: 8, listStyle: "none", padding: 0 }}
+          >
+            {entries.map(({ check, finding }) => (
+              <FindingRow key={`${check.id}-${finding.id}`} finding={finding} />
+            ))}
+          </ul>
+        </section>
+      ))}
     </section>
   );
 }
@@ -284,12 +319,21 @@ function CheckBox({ result, index }: { result: CheckResult; index: number }) {
 
   return (
     <li
-      className={`box box--railed rise ${tone}`}
+      className={`box box--area rise ${tone}`}
       style={{ ["--i" as string]: Math.min(index, 12) }}
     >
       <div className="box__head">
         <span className="dot" aria-hidden="true" />
         <span className="box__title">{result.title}</span>
+        {/* The status was carried by the rail colour alone, which a reader
+            with colour blindness or a greyscale print cannot recover. The word
+            states it, and the colour only reinforces it. */}
+        <span
+          className={`chip ${tone}`}
+          style={{ marginLeft: "auto", flex: "none" }}
+        >
+          {statusLabel(result.status)}
+        </span>
       </div>
       <p className="box__body">{result.headline}</p>
 
@@ -346,11 +390,19 @@ function ChecksByGroup({ report }: { report: ScanReport }) {
       </p>
 
       {sections.map((section) => (
-        <section key={section.key} style={{ marginTop: 20 }} aria-label={section.label}>
+        <section
+          key={section.key}
+          className={section.key === "other" ? undefined : `area-${section.key}`}
+          style={{ marginTop: 20 }}
+          aria-label={section.label}
+        >
           <div className="flex flex-wrap items-baseline justify-between gap-3">
-            <h4 style={{ fontSize: 13.5, fontWeight: 600, letterSpacing: "-0.005em" }}>
-              {section.label}
-            </h4>
+            <div className="area-head">
+              <span className="dot" aria-hidden="true" />
+              <h4 style={{ fontSize: 13.5, fontWeight: 600, letterSpacing: "-0.005em" }}>
+                {section.label}
+              </h4>
+            </div>
             <span className="tabular" style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
               {section.results.length}
             </span>
@@ -412,15 +464,26 @@ function Provenance({ report }: { report: ScanReport }) {
 
 export function ReportView({ report }: { report: ScanReport }) {
   return (
-    <article className="rise" aria-label={`Report for ${report.target.host}`}>
-      <div className="box" style={{ padding: "18px 20px" }}>
-        <HeaderRow report={report} />
-      </div>
-      <Verdict report={report} />
-      <CountTiles report={report} />
-      <FindingsSection report={report} />
-      <ChecksByGroup report={report} />
-      <Provenance report={report} />
-    </article>
+    <>
+      <article
+        className="screen-doc rise"
+        aria-label={`Report for ${report.target.host}`}
+      >
+        <div className="box" style={{ padding: "18px 20px" }}>
+          <HeaderRow report={report} />
+        </div>
+        <Verdict report={report} />
+        <CountTiles report={report} />
+        <FindingsSection report={report} />
+        <ChecksByGroup report={report} />
+        <Provenance report={report} />
+      </article>
+      {/*
+       * The paper version of the same report. It is in the DOM so the browser
+       * has it when the print dialog opens; `print.css` hides one and shows the
+       * other by media, so the screen tree above is untouched on a display.
+       */}
+      <PrintReport report={report} />
+    </>
   );
 }

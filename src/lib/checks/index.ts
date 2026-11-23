@@ -38,6 +38,8 @@ import { certificateRevocation } from "./certificate-revocation";
 import { edgeProtection } from "./edge-protection";
 import { blocklist } from "./blocklist";
 import { breachHistory } from "./breach-history";
+import { reconSubdomains } from "./recon-subdomains";
+import { urlScan } from "./url-scan";
 
 /**
  * Order is the report order: the transport and name layer first, then what the
@@ -61,6 +63,7 @@ export const checks: CheckDefinition[] = [
   cohosted,
   vulnerabilityExposure,
   subdomains,
+  reconSubdomains,
   techStack,
   threatIntel,
   malwareListings,
@@ -74,9 +77,8 @@ export const checks: CheckDefinition[] = [
   performance,
   carbon,
   darkPatterns,
+  urlScan,
 ];
-
-export const byId = new Map(checks.map((c) => [c.id, c]));
 
 export const GROUP_LABEL: Record<CheckGroup, string> = {
   transport: "Transport and certificates",
@@ -90,6 +92,7 @@ export const GROUP_LABEL: Record<CheckGroup, string> = {
   infrastructure: "Infrastructure",
   threat: "Reputation",
   ux: "Interface friction",
+  recon: "Reconnaissance",
 };
 
 export const GROUP_ORDER: CheckGroup[] = [
@@ -98,6 +101,7 @@ export const GROUP_ORDER: CheckGroup[] = [
   "headers",
   "email",
   "infrastructure",
+  "recon",
   "privacy",
   "content",
   "performance",
