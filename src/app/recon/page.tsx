@@ -34,6 +34,25 @@ function knownChecks(ids: string[]): string[] {
   return ids.filter((id) => CHECK_INDEX.has(id));
 }
 
+/**
+ * Where each phase can actually be carried out.
+ *
+ * The page used to describe the workflow and stop. A reader who wants to run a
+ * step needs a door to it, so each phase links to the tool that performs it: the
+ * full scan for the phases a check covers, the dork generator for search, or the
+ * ports console for the nmap step.
+ */
+const PHASE_TOOL: Record<string, { href: string; label: string }> = {
+  asn: { href: "/scan", label: "Scan the address" },
+  subdomains: { href: "/scan", label: "Enumerate on a scan" },
+  fingerprint: { href: "/scan", label: "Fingerprint a host" },
+  dorking: { href: "/dorks", label: "Generate the dorks" },
+  content: { href: "/sources", label: "Find a content tool" },
+  ports: { href: "/ports", label: "Read ports and write nmap" },
+  tls: { href: "/scan", label: "Read the certificates" },
+  reputation: { href: "/url-scan", label: "Check a URL" },
+};
+
 function StatusBadge({ inBrowser }: { inBrowser: boolean }) {
   return (
     <span
@@ -184,10 +203,19 @@ export default function ReconPage() {
                     href={phase.sourceUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ color: "var(--primary)" }}
+                    style={{ color: "var(--muted-foreground)" }}
                   >
                     {phase.source}
                   </a>
+                  {PHASE_TOOL[phase.id] && (
+                    <Link
+                      href={PHASE_TOOL[phase.id].href}
+                      className="btn btn-primary btn-sm"
+                      style={{ marginLeft: "auto" }}
+                    >
+                      {PHASE_TOOL[phase.id].label}
+                    </Link>
+                  )}
                 </div>
               </li>
             );

@@ -204,6 +204,8 @@ export function pageMeta({
 export const ROUTES = [
   { href: "/", label: "Home", group: "product" },
   { href: "/scan", label: "Scan", group: "product" },
+  { href: "/url-scan", label: "URL scan", group: "product" },
+  { href: "/ports", label: "Nmap", group: "product" },
   { href: "/checks", label: "Checks", group: "product" },
   { href: "/sources", label: "Sources", group: "product" },
   { href: "/dorks", label: "Dorks", group: "product" },

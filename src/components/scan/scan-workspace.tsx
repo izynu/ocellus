@@ -25,6 +25,7 @@ import type { CheckResult, ScanReport } from "@/lib/types";
 import { GROUP_LABEL, GROUP_ORDER, checks } from "@/lib/checks";
 import { statusLabel, statusTone } from "./check-detail";
 import { ReportView } from "./report-view";
+import { KeyPanel } from "./key-panel";
 
 type Phase = "idle" | "running" | "done";
 
@@ -280,6 +281,9 @@ export function ScanWorkspace() {
 
       {phase === "idle" && (
         <div className="rise" style={{ marginTop: 22 }}>
+          <div style={{ marginBottom: 20 }}>
+            <KeyPanel />
+          </div>
           <p
             style={{
               fontSize: 14,

@@ -50,6 +50,8 @@ import { blocklist } from "./blocklist";
 import { breachHistory } from "./breach-history";
 import { reconSubdomains } from "./recon-subdomains";
 import { urlScan } from "./url-scan";
+import { shodanHost } from "./shodan-host";
+import { virusTotal } from "./virustotal";
 
 /**
  * Order is the report order: the transport and name layer first, then what the
@@ -70,12 +72,14 @@ export const checks: CheckDefinition[] = [
   emailAuth,
   securityTxt,
   infrastructure,
+  shodanHost,
   cohosted,
   vulnerabilityExposure,
   subdomains,
   reconSubdomains,
   techStack,
   threatIntel,
+  virusTotal,
   malwareListings,
   blocklist,
   breachHistory,

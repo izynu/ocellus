@@ -49,6 +49,8 @@ import type { CarbonData } from "@/lib/checks/carbon";
 import type { DarkPatternData } from "@/lib/checks/dark-patterns";
 import type { ReconSubdomainsData } from "@/lib/checks/recon-subdomains";
 import type { UrlScanData } from "@/lib/checks/url-scan";
+import type { ShodanHostData } from "@/lib/checks/shodan-host";
+import type { VirusTotalData } from "@/lib/checks/virustotal";
 
 type Fact = {
   label: string;
@@ -470,6 +472,43 @@ function factsFor(id: string, data: unknown): Fact[] {
           label: "Sources",
           value: d.otxAnswered ? (d.fromInternetDb > 0 ? "OTX and Shodan" : "OTX") : "Shodan only",
         },
+      ];
+    }
+
+    case "shodan-host": {
+      const d = data as ShodanHostData;
+      return [
+        { label: "Address", value: <span className="mono">{d.ip ?? NONE}</span> },
+        { label: "Owner", value: d.org ?? NONE },
+        {
+          label: "Open ports",
+          value: d.ports.length > 0 ? d.ports.join(", ") : "none recorded",
+        },
+        {
+          label: "Banners",
+          value:
+            d.banners.length > 0
+              ? list(d.banners.map((b) => `${b.port}: ${[b.product, b.version].filter(Boolean).join(" ") || b.title || "unnamed"}`), 3)
+              : "none",
+        },
+        {
+          label: "CVEs",
+          value: d.vulns.length > 0 ? list(d.vulns, 3) : "none matched",
+          tone: d.vulns.length > 0 ? "tone-warn" : undefined,
+        },
+      ];
+    }
+
+    case "virustotal": {
+      const d = data as VirusTotalData;
+      return [
+        { label: "Engines", value: d.engines > 0 ? String(d.engines) : NONE },
+        {
+          label: "Detections",
+          value: d.malicious + d.suspicious > 0 ? `${d.malicious} malicious, ${d.suspicious} suspicious` : d.queried ? "none" : NONE,
+          tone: d.malicious > 0 ? "tone-fail" : undefined,
+        },
+        { label: "Reputation", value: d.reputation === null ? NONE : String(d.reputation) },
       ];
     }
 

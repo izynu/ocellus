@@ -161,12 +161,19 @@ body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
-  font-size: 16px;
+  /*
+   * Fluid body size: 15px on a phone, 16px on a laptop, 17px on a large
+   * display. A fixed 16px is either cramped on a small screen or small on a
+   * wide one; `clamp` follows the viewport between the two ends.
+   */
+  font-size: clamp(15px, 0.55vw + 13px, 17px);
   line-height: 1.62;
   font-feature-settings: "cv11", "ss01";
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   min-height: 100dvh;
+  /* Never let a wide child push the page sideways. */
+  overflow-x: hidden;
 }
 
 h1,
@@ -179,6 +186,19 @@ h4 {
   font-weight: 620;
 }
 
+h1 {
+  font-size: clamp(1.75rem, 3.2vw + 1rem, 2.9rem);
+}
+
+h2 {
+  font-size: clamp(1.28rem, 1.1vw + 1rem, 1.62rem);
+}
+
+h3 {
+  font-size: clamp(1.05rem, 0.5vw + 0.95rem, 1.2rem);
+}
+
+/* Measure follows the column, so a wide screen gets a wider, shorter read. */
 p {
   text-wrap: pretty;
 }
@@ -272,14 +292,21 @@ pre,
 
 .container-page {
   width: 100%;
-  max-width: var(--page-max);
+  /* A wider content edge on a big display, so the page fills the screen. */
+  max-width: clamp(1120px, 86vw, 1480px);
   margin-inline: auto;
-  padding-inline: 20px;
+  padding-inline: 18px;
 }
 
 @media (min-width: 768px) {
   .container-page {
-    padding-inline: 32px;
+    padding-inline: 28px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .container-page {
+    padding-inline: 40px;
   }
 }
 
@@ -745,15 +772,41 @@ main p a:hover {
  *
  * A box is an opaque sheet, not glass. Glass belongs to chrome that floats over
  * the scene; a box is content.
+ *
+ * Boxes are wide, not tall. A card that grows downward pushes everything below
+ * it out of view and makes a page of twelve categories a scroll. Every card has
+ * a minimum width that keeps two or three across on a laptop, and its content
+ * is laid out in a row where it can be.
  */
 .box {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 15px 16px;
+  padding: 14px 16px;
   min-width: 0;
   position: relative;
   transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+/* A card whose body sits beside its head rather than under it. */
+.box--row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.box--row .box__main {
+  min-width: 0;
+  flex: 1;
+}
+
+.box--row .box__aside {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  text-align: right;
 }
 
 .box--raised {
@@ -786,7 +839,7 @@ main p a:hover {
 
 .box-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
   gap: 12px;
   list-style: none;
   padding: 0;
@@ -794,11 +847,17 @@ main p a:hover {
 }
 
 .box-grid--wide {
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 400px), 1fr));
 }
 
 .box-grid--narrow {
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr));
+}
+
+/* Two across on a small laptop, one on a phone: for dense evidence rows. */
+.box-grid--dense {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+  gap: 10px;
 }
 
 .box__head {
