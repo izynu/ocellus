@@ -3,10 +3,17 @@
 /**
  * The smallest unit of the report: one finding, and one check's findings.
  *
- * Both the top-level findings list and the per-check table use `FindingRow`, so
- * a finding looks and behaves the same wherever it appears. The only state in
- * this file is whether a disclosure is open, which is why it lives in the client
- * graph.
+ * Both the top-level findings sections and the per-check boxes use
+ * `FindingRow`, so a finding looks and behaves the same wherever it appears.
+ * The only state in this file is whether a disclosure is open, which is why it
+ * lives in the client graph.
+ *
+ * A finding is read in two passes. The first pass is the severity, the title
+ * and one sentence of detail, which is all most readers need. The second pass
+ * is behind "How to fix": the measured evidence as a small table, the
+ * remediation, and the standard the finding is judged against. A disclosure
+ * rather than a dense block, because a reader scanning ten findings should not
+ * have to read ten remediation paragraphs to reach the eleventh title.
  */
 
 import { useId, useState } from "react";
@@ -78,6 +85,58 @@ function isHttpUrl(value: string): boolean {
   return /^https?:\/\//i.test(value);
 }
 
+/** One row of the evidence table. `detail` is a second line, not a new row. */
+function EvidenceTable({ rows }: { rows: EvidenceRow[] }) {
+  return (
+    <table className="evidence" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+      <caption className="sr-only">Measured evidence behind this finding</caption>
+      <tbody>
+        {rows.map((row, index) => (
+          <tr key={`${row.label}-${index}`}>
+            <th
+              scope="row"
+              style={{
+                textAlign: "left",
+                verticalAlign: "top",
+                fontWeight: 500,
+                color: "var(--muted-foreground)",
+                padding: "5px 14px 5px 0",
+                whiteSpace: "nowrap",
+                borderTop: index === 0 ? "none" : "1px solid var(--border)",
+              }}
+            >
+              {row.label}
+            </th>
+            <td
+              className={EVIDENCE_TONE[row.tone ?? "neutral"]}
+              style={{
+                verticalAlign: "top",
+                padding: "5px 0",
+                overflowWrap: "anywhere",
+                borderTop: index === 0 ? "none" : "1px solid var(--border)",
+              }}
+            >
+              {row.value}
+              {row.detail && (
+                <span
+                  style={{
+                    display: "block",
+                    marginTop: 2,
+                    fontSize: 12,
+                    color: "var(--muted-foreground)",
+                  }}
+                >
+                  {row.detail}
+                </span>
+              )}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 /**
  * One finding. Rendered as a list item, so it must sit inside a list.
  * The disclosure is a real button with `aria-expanded` and `aria-controls`,
@@ -87,10 +146,9 @@ export function FindingRow({ finding }: { finding: Finding }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
   const meta = SEVERITY_META[finding.severity] ?? SEVERITY_META.info;
+  const hasEvidence = Boolean(finding.evidence && finding.evidence.length > 0);
   const hasDetail = Boolean(
-    finding.remediation ||
-      (finding.reference && isHttpUrl(finding.reference.url)) ||
-      (finding.evidence && finding.evidence.length > 0)
+    finding.remediation || (finding.reference && isHttpUrl(finding.reference.url)) || hasEvidence
   );
 
   return (
@@ -99,12 +157,27 @@ export function FindingRow({ finding }: { finding: Finding }) {
         <span className={`chip ${meta.tone}`} style={severityChipStyle(finding.severity)}>
           {meta.label}
         </span>
-        <span style={{ fontSize: 15, fontWeight: 580, letterSpacing: "-0.005em" }}>
+        <span
+          style={{
+            fontSize: 15,
+            fontWeight: 580,
+            letterSpacing: "-0.005em",
+            overflowWrap: "anywhere",
+          }}
+        >
           {finding.title}
         </span>
       </div>
 
-      <p style={{ marginTop: 6, fontSize: 14, color: "var(--muted-foreground)", overflowWrap: "anywhere" }}>
+      <p
+        style={{
+          marginTop: 6,
+          fontSize: 14,
+          lineHeight: 1.55,
+          color: "var(--muted-foreground)",
+          overflowWrap: "anywhere",
+        }}
+      >
         {finding.detail}
       </p>
 
@@ -126,52 +199,31 @@ export function FindingRow({ finding }: { finding: Finding }) {
                 transition: "transform 160ms ease",
               }}
             />
-            How to fix
+            {open ? "Hide details" : "How to fix"}
           </button>
 
-          <div id={panelId} hidden={!open} style={{ marginTop: 4 }}>
-            {finding.evidence && finding.evidence.length > 0 && (
-              <dl
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "auto minmax(0, 1fr)",
-                  gap: "4px 14px",
-                  fontSize: 13,
-                  marginBottom: 10,
-                }}
-              >
-                {finding.evidence.map((row, index) => (
-                  <div key={`${row.label}-${index}`} style={{ display: "contents" }}>
-                    <dt style={{ color: "var(--muted-foreground)" }}>{row.label}</dt>
-                    <dd
-                      className={EVIDENCE_TONE[row.tone ?? "neutral"]}
-                      style={{ margin: 0, overflowWrap: "anywhere" }}
-                    >
-                      {row.value}
-                      {row.detail && (
-                        <span
-                          style={{
-                            display: "block",
-                            marginTop: 2,
-                            fontSize: 12,
-                            color: "var(--muted-foreground)",
-                          }}
-                        >
-                          {row.detail}
-                        </span>
-                      )}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
+          <div id={panelId} hidden={!open} style={{ marginTop: 8 }}>
+            {hasEvidence && (
+              <div style={{ marginBottom: 10 }}>
+                <EvidenceTable rows={finding.evidence!} />
+              </div>
             )}
 
             {finding.remediation && (
-              <p style={{ fontSize: 14, maxWidth: "68ch", overflowWrap: "anywhere" }}>{finding.remediation}</p>
+              <p
+                style={{
+                  fontSize: 14,
+                  lineHeight: 1.55,
+                  maxWidth: "68ch",
+                  overflowWrap: "anywhere",
+                }}
+              >
+                {finding.remediation}
+              </p>
             )}
 
             {finding.reference && isHttpUrl(finding.reference.url) && (
-              <p style={{ marginTop: 8, fontSize: 13 }}>
+              <p style={{ marginTop: 8, fontSize: 13, overflowWrap: "anywhere" }}>
                 <span style={{ color: "var(--muted-foreground)" }}>Reference: </span>
                 <a
                   href={finding.reference.url}
@@ -185,6 +237,9 @@ export function FindingRow({ finding }: { finding: Finding }) {
                 >
                   {finding.reference.label}
                 </a>
+                <span className="mono" style={{ display: "block", marginTop: 2, fontSize: 11.5 }}>
+                  {finding.reference.url}
+                </span>
               </p>
             )}
           </div>
@@ -196,7 +251,7 @@ export function FindingRow({ finding }: { finding: Finding }) {
 
 /**
  * One check's findings behind a disclosure. `defaultOpen` starts it expanded,
- * which the table does not use, but a future focused view can.
+ * which the report does not use, but a focused view can.
  */
 export function CheckDetail({
   result,
@@ -233,7 +288,7 @@ export function CheckDetail({
       </button>
 
       <div id={panelId} hidden={!open}>
-        <ul className="divide-y divide-border" style={{ marginTop: 2 }}>
+        <ul className="divide-y divide-border" style={{ marginTop: 2, listStyle: "none", padding: 0 }}>
           {result.findings.map((finding) => (
             <FindingRow key={finding.id} finding={finding} />
           ))}

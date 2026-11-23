@@ -8,32 +8,44 @@ import { pageMeta } from "@/lib/site";
  * The reconnaissance methodology, and which of its phases Ocellus runs.
  *
  * The phases are a published workflow, and the page's job is to place the tool
- * honestly inside it. The column that separates a phase a scan performs from one
+ * honestly inside it. The badge that separates a phase a scan performs from one
  * that needs a terminal is the whole point of the page: a walkthrough that
  * implied Ocellus did all of it would describe software that does not exist.
  *
  * The check ids on each phase are resolved against the live registry, so a
- * phase can never link to a check that has been renamed or removed.
+ * phase can never link to a check that has been renamed or removed. Each id
+ * links to the group section it belongs to on the checks page, which is where
+ * the check's question and weight are written down.
  */
 
 export const metadata = pageMeta({
   title: "Recon",
-  description: `The reconnaissance workflow Ocellus was built around: ${RECON_PHASES.length} phases from address space to reputation, with the ${browserPhaseCount()} a browser can run and the ones that need a terminal.`,
+  description: `The reconnaissance workflow Ocellus was built around: ${RECON_PHASES.length} phases from address space to reputation, with the ${browserPhaseCount()} that a browser can run and the ones that need a terminal.`,
   path: "/recon",
 });
 
-const KNOWN_CHECK = new Set(checks.map((check) => check.id));
+/** Check id to its group and title, so a phase can link and name each check. */
+const CHECK_INDEX = new Map(
+  checks.map((check) => [check.id, { group: check.group, title: check.title }])
+);
+
+/** Check ids on a phase that the live registry actually contains. */
+function knownChecks(ids: string[]): string[] {
+  return ids.filter((id) => CHECK_INDEX.has(id));
+}
 
 function StatusBadge({ inBrowser }: { inBrowser: boolean }) {
   return (
     <span
-      className={`chip ${inBrowser ? "tone-pass" : "tone-idle"}`}
+      className="badge"
       style={{
+        color: inBrowser ? "var(--signal-pass)" : "var(--signal-idle)",
         borderColor: inBrowser
           ? "color-mix(in oklab, var(--signal-pass) 45%, var(--border))"
           : "var(--border)",
       }}
     >
+      <span className="dot" aria-hidden="true" />
       {inBrowser ? "Runs in Ocellus" : "Needs a terminal"}
     </span>
   );
@@ -76,13 +88,12 @@ export default function ReconPage() {
 
         <ol className="box-grid box-grid--wide mt-10" style={{ counterReset: "step 0" }}>
           {RECON_PHASES.map((phase, index) => {
-            const linked = phase.checks.filter((id) => KNOWN_CHECK.has(id));
+            const linked = knownChecks(phase.checks);
+            const group = linked.length > 0 ? CHECK_INDEX.get(linked[0])?.group : undefined;
             return (
               <li
                 key={phase.id}
-                className={`box box--raised box--railed rise ${
-                  phase.inBrowser ? "tone-pass" : "tone-idle"
-                }`}
+                className={`box box--raised rise ${group ? `box--area area-${group}` : ""}`}
                 style={{ ["--i" as string]: Math.min(index, 10), padding: "18px 20px" }}
               >
                 <div className="flex items-center gap-3">
@@ -96,9 +107,12 @@ export default function ReconPage() {
                   <hr className="hairline m-0 flex-1" />
                 </div>
 
-                <h2 className="box__title" style={{ fontSize: 19, marginTop: 12 }}>
-                  {phase.title}
-                </h2>
+                <div className="area-head" style={{ marginTop: 12 }}>
+                  <span className="dot" aria-hidden="true" />
+                  <h2 className="box__title" style={{ fontSize: 19 }}>
+                    {phase.title}
+                  </h2>
+                </div>
                 <p
                   className="mono"
                   style={{ marginTop: 6, fontSize: 12.5, color: "var(--muted-foreground)" }}
@@ -146,13 +160,21 @@ export default function ReconPage() {
                         gap: 6,
                       }}
                     >
-                      {linked.map((id) => (
-                        <li key={id}>
-                          <Link href="/checks" className="chip mono chip--wrap">
-                            {id}
-                          </Link>
-                        </li>
-                      ))}
+                      {linked.map((id) => {
+                        const meta = CHECK_INDEX.get(id);
+                        return (
+                          <li key={id}>
+                            <Link
+                              href={`/checks#group-${meta?.group}`}
+                              className="chip chip--wrap mono"
+                              title={meta?.title}
+                              style={{ color: "var(--foreground)", textDecoration: "none" }}
+                            >
+                              {id}
+                            </Link>
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
                 )}
@@ -195,10 +217,9 @@ export default function ReconPage() {
             </ul>
           </div>
           <p style={{ marginTop: 12, fontSize: 13.5, color: "var(--muted-foreground)" }}>
-            The <Link href="/scanners" style={{ color: "var(--primary)" }}>scanner coverage page</Link>{" "}
-            lists the named tools by category and marks which ones Ocellus answers itself. The{" "}
-            <Link href="/dorks" style={{ color: "var(--primary)" }}>dork page</Link> generates the
-            search-engine step for any domain.
+            The <Link href="/sources">source catalogue</Link> lists every named tool by category
+            and marks which ones Ocellus answers itself. The{" "}
+            <Link href="/dorks">dork page</Link> generates the search-engine step for any domain.
           </p>
         </section>
       </div>

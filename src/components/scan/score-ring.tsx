@@ -79,13 +79,23 @@ export function ScoreRing({
         className="absolute inset-0 flex flex-col items-center justify-center"
         style={{ pointerEvents: "none" }}
       >
-        <span className={`tabular ${tone}`} style={{ fontSize: 40, fontWeight: 620, lineHeight: 1 }}>
+        {/*
+         * 36px is the size for a three-digit score on a 132px ring: any
+         * larger and "100" starts to crowd the stroke, any smaller and the
+         * number stops being the first thing a reader sees. Tabular figures
+         * keep 100 from shifting sideways beside 87.
+         */}
+        <span
+          className={`tabular ${tone}`}
+          style={{ fontSize: 36, fontWeight: 620, lineHeight: 1, letterSpacing: "-0.02em" }}
+        >
           {clamped}
         </span>
         <span
           style={{
-            marginTop: 4,
+            marginTop: 5,
             fontSize: 11.5,
+            fontWeight: 560,
             letterSpacing: "0.06em",
             textTransform: "uppercase",
             color: "var(--muted-foreground)",
