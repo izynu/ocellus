@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import { SITE, asset } from "@/lib/site";
+import { KEYWORDS, SITE, asset } from "@/lib/site";
 
 /*
  * Fonts are self-hosted. The site's own subject is third-party requests, so
@@ -42,19 +42,7 @@ export const metadata: Metadata = {
   applicationName: SITE.name,
   authors: [{ name: SITE.author, url: SITE.authorUrl }],
   creator: SITE.author,
-  keywords: [
-    "website audit",
-    "security headers",
-    "DNS",
-    "email authentication",
-    "SPF",
-    "DMARC",
-    "certificate transparency",
-    "accessibility",
-    "dark patterns",
-    "privacy",
-    "web scanner",
-  ],
+  keywords: [...KEYWORDS],
   alternates: { canonical: asset("/") },
   openGraph: {
     type: "website",
@@ -85,8 +73,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#0b0e13" },
-    { media: "(prefers-color-scheme: light)", color: "#f4f6f8" },
+    { media: "(prefers-color-scheme: dark)", color: "#080c10" },
+    { media: "(prefers-color-scheme: light)", color: "#f3f6f7" },
   ],
   width: "device-width",
   initialScale: 1,
