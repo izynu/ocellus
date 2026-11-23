@@ -46,9 +46,10 @@ export type RunOptions = {
   checkTimeoutMs?: number;
 };
 
-// The slowest upstream is crt.sh, which allows 45s and one retry. The per-check
-// ceiling has to sit above that, or the retry can never complete and the
-// generous timeout on the fetch buys nothing.
+// The slowest upstream is the certificate index: a cold query for a busy domain
+// answers a gateway timeout while it warms, and the check retries once after a
+// delay. The per-check ceiling has to sit above that wait, or the retry can
+// never complete and the generous timeout on the fetch buys nothing.
 const DEFAULT_CHECK_TIMEOUT = 100_000;
 
 export async function runScan(
