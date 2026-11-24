@@ -6,9 +6,14 @@
  * animated ring prints as a still frame that may be captured mid-draw. So the
  * printed report is its own component, built for a sheet. It is not a
  * re-skin of the screen view: it carries a cover, an executive summary, the
- * findings grouped by category, a full appendix of every check, and a
- * provenance block, because a printed report is read away from the screen
- * where it was produced.
+ * findings grouped by category, a check-by-check appendix, and a provenance
+ * block, because a printed report is read away from the screen where it was
+ * produced.
+ *
+ * The layout is deliberately plain: one left edge, one spacing scale, one type
+ * scale, and three surfaces (a bordered block, a ruled label/value row, and a
+ * rail-led card). Status and severity are a coloured rail plus a written word,
+ * never a fill, so the sheet survives greyscale and photocopying.
  *
  * It renders from the same `ScanReport` the screen report renders from, so the
  * two can never disagree about a value. It is mounted alongside the screen
@@ -186,12 +191,16 @@ function describeValue(value: unknown): string | null {
   return null;
 }
 
-/** The key values behind a check, capped so the appendix stays readable. */
-function factsFor(data: unknown): FactRow[] {
+/**
+ * The key values behind a check, capped so the appendix stays readable. Six is
+ * the print budget: enough to carry the measured facts, short enough that a
+ * check remains one block on one page.
+ */
+function factsFor(data: unknown, limit = 6): FactRow[] {
   if (!data || typeof data !== "object" || Array.isArray(data)) return [];
   const rows: FactRow[] = [];
   for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
-    if (rows.length >= 10) break;
+    if (rows.length >= limit) break;
     const described = describeValue(value);
     if (described) rows.push({ label: labelFor(key), value: described });
   }
@@ -310,33 +319,51 @@ function Cover({ report }: { report: ScanReport }) {
 
       <h1 className="print-cover__host">{report.target.host}</h1>
 
-      <div className="print-score">
-        <span className="print-score__number">{report.score}</span>
-        <span className="print-score__of">/100</span>
-        <span className="print-score__grade">Grade {report.grade}</span>
+      <div className="print-cover__score">
+        <span className="print-cover__number">{report.score}</span>
+        <span className="print-cover__of">out of 100</span>
+        <span className="print-cover__grade">Grade {report.grade}</span>
       </div>
 
-      <p className="print-verdict">{verdictFor(report.score)}</p>
+      <p className="print-cover__verdict">{verdictFor(report.score)}</p>
 
-      <dl className="print-cover__meta">
-        <dt>Scanned address</dt>
-        <dd className="mono">{report.target.url}</dd>
-        <dt>Started</dt>
-        <dd>{formatDate(report.startedAt)}</dd>
-        <dt>Finished</dt>
-        <dd>{formatDate(report.finishedAt)}</dd>
-        <dt>Duration</dt>
-        <dd>{formatDuration(report.durationMs)}</dd>
-        <dt>Checks run</dt>
-        <dd>{total}</dd>
-        <dt>Checks scored</dt>
-        <dd>
-          {scored} of {total} ({excluded} not scored)
-        </dd>
-      </dl>
+      <table className="p-rows p-rows--kv print-cover__meta">
+        <colgroup>
+          <col style={{ width: "34mm" }} />
+          <col />
+        </colgroup>
+        <tbody>
+          <tr className="p-row">
+            <th scope="row">Scanned address</th>
+            <td className="mono">{report.target.url}</td>
+          </tr>
+          <tr className="p-row">
+            <th scope="row">Started</th>
+            <td>{formatDate(report.startedAt)}</td>
+          </tr>
+          <tr className="p-row">
+            <th scope="row">Finished</th>
+            <td>{formatDate(report.finishedAt)}</td>
+          </tr>
+          <tr className="p-row">
+            <th scope="row">Duration</th>
+            <td>{formatDuration(report.durationMs)}</td>
+          </tr>
+          <tr className="p-row">
+            <th scope="row">Checks run</th>
+            <td>{total}</td>
+          </tr>
+          <tr className="p-row">
+            <th scope="row">Checks scored</th>
+            <td>
+              {scored} of {total} ({excluded} not scored)
+            </td>
+          </tr>
+        </tbody>
+      </table>
 
       <div className="print-contents">
-        <p className="print-contents__title">Contents</p>
+        <p className="p-label">Contents</p>
         <ol>
           {contents.map((entry) => (
             <li key={entry}>{entry}</li>
@@ -371,19 +398,21 @@ function ExecutiveSummary({ report }: { report: ScanReport }) {
     <section className="print-section">
       <h2>Executive summary</h2>
 
-      <p className="print-lead">
+      <p className="p-lead">
         {report.target.host} scored {report.score} out of 100, grade {report.grade}.{" "}
         {verdictFor(report.score)}
       </p>
 
-      <h3>Outcome by status</h3>
-      <table className="print-table">
+      <table className="p-rows">
+        <colgroup>
+          <col style={{ width: "32mm" }} />
+          <col style={{ width: "18mm" }} />
+          <col />
+        </colgroup>
         <thead>
           <tr>
             <th scope="col">Status</th>
-            <th scope="col" className="num">
-              Checks
-            </th>
+            <th scope="col" className="p-num">Checks</th>
             <th scope="col">What it means</th>
           </tr>
         </thead>
@@ -391,67 +420,69 @@ function ExecutiveSummary({ report }: { report: ScanReport }) {
           {statusRows.map((row) => (
             <tr key={row.label}>
               <th scope="row">{row.label}</th>
-              <td className="num">{row.value.toLocaleString("en-US")}</td>
-              <td className="muted">{row.note}</td>
+              <td className="p-num">{row.value.toLocaleString("en-US")}</td>
+              <td className="p-meta">{row.note}</td>
             </tr>
           ))}
-          <tr className="print-table__total">
+          <tr className="p-total">
             <th scope="row">Total checks</th>
-            <td className="num">{total.toLocaleString("en-US")}</td>
-            <td className="muted">
+            <td className="p-num">{total.toLocaleString("en-US")}</td>
+            <td className="p-meta">
               {scored} scored, {excluded} excluded from the grade
             </td>
           </tr>
         </tbody>
       </table>
 
-      <h3>Outcome by category</h3>
-      <table className="print-table print-table--category">
+      <table className="p-rows">
+        <colgroup>
+          <col />
+          <col style={{ width: "14mm" }} />
+          <col style={{ width: "16mm" }} />
+          <col style={{ width: "12mm" }} />
+          <col style={{ width: "12mm" }} />
+          <col style={{ width: "12mm" }} />
+          <col style={{ width: "14mm" }} />
+        </colgroup>
         <thead>
           <tr>
             <th scope="col">Category</th>
-            <th scope="col" className="num">
-              Checks
-            </th>
-            <th scope="col" className="num">
-              Findings
-            </th>
-            <th scope="col" className="num">
-              Pass / Warn / Fail
-            </th>
-            <th scope="col" className="num">
-              Other
-            </th>
+            <th scope="col" className="p-num">Checks</th>
+            <th scope="col" className="p-num">Findings</th>
+            <th scope="col" className="p-num">Pass</th>
+            <th scope="col" className="p-num">Warn</th>
+            <th scope="col" className="p-num">Fail</th>
+            <th scope="col" className="p-num">Other</th>
           </tr>
         </thead>
         <tbody>
           {stats.map((row) => (
             <tr key={row.group}>
               <th scope="row">{groupLabel(row.group)}</th>
-              <td className="num">{row.checks}</td>
-              <td className="num">{row.findings}</td>
-              <td className="num">
-                {row.counts.pass} / {row.counts.warn} / {row.counts.fail}
-              </td>
-              <td className="num">{row.counts.other}</td>
+              <td className="p-num">{row.checks}</td>
+              <td className="p-num">{row.findings}</td>
+              <td className="p-num">{row.counts.pass}</td>
+              <td className="p-num">{row.counts.warn}</td>
+              <td className="p-num">{row.counts.fail}</td>
+              <td className="p-num">{row.counts.other}</td>
             </tr>
           ))}
-          <tr className="print-table__total">
+          <tr className="p-total">
             <th scope="row">All categories</th>
-            <td className="num">{total}</td>
-            <td className="num">{findingsTotal}</td>
-            <td className="num">
-              {report.counts.pass} / {report.counts.warn} / {report.counts.fail}
-            </td>
-            <td className="num">
+            <td className="p-num">{total}</td>
+            <td className="p-num">{findingsTotal}</td>
+            <td className="p-num">{report.counts.pass}</td>
+            <td className="p-num">{report.counts.warn}</td>
+            <td className="p-num">{report.counts.fail}</td>
+            <td className="p-num">
               {report.counts.info + report.counts.unavailable + report.counts.skipped}
             </td>
           </tr>
         </tbody>
       </table>
 
-      <div className="print-callout">
-        <p className="print-callout__title">Unavailable is not a pass</p>
+      <div className="p-block">
+        <p className="p-label">Unavailable is not a pass</p>
         <p>
           The grade is computed over {scored} of {total} checks. A check whose source could not
           be reached or refused the request is removed from the denominator rather than counted
@@ -463,40 +494,40 @@ function ExecutiveSummary({ report }: { report: ScanReport }) {
   );
 }
 
-function FindingArticle({ entry }: { entry: FindingEntry }) {
+function FindingCard({ entry, showCheck }: { entry: FindingEntry; showCheck: boolean }) {
   const { check, finding } = entry;
+  const reference = finding.reference;
+  const hasReferenceUrl = Boolean(reference && /^https?:\/\//i.test(reference.url));
+  // A finding that carries its own detail, a fix, a reference and evidence can
+  // run past half a page. Held whole it can strand a page; see the CSS note.
+  const tall = Boolean(finding.remediation) || Boolean(reference) || Boolean(finding.evidence?.length);
 
-  // The severity is stated once, in the band heading above this article, and
-  // repeated only as the 3pt rail. Printing the word on every card as well
-  // made a three-item band read as three separate pronouncements.
   return (
-    <article className={`print-finding print-finding--${finding.severity}`}>
-      <h4 className="print-finding__title">{finding.title}</h4>
+    <article className={`p-card p-card--${finding.severity}${tall ? " p-card--split" : ""}`}>
+      <div className="p-card__head">
+        <h4 className="p-card__title">{finding.title}</h4>
+        <span className="p-card__sev">{SEVERITY_META[finding.severity].label}</span>
+      </div>
 
-      <p className="print-finding__detail">{finding.detail}</p>
+      <p className="p-card__detail">{finding.detail}</p>
 
       {finding.remediation && (
-        <p className="print-finding__fix">
-          <span className="print-finding__label">How to fix: </span>
+        <p className="p-card__detail">
+          <span className="p-strong">How to fix: </span>
           {finding.remediation}
         </p>
       )}
 
-      {finding.reference && /^https?:\/\//i.test(finding.reference.url) && (
-        <p className="print-finding__ref">
-          <span className="print-finding__label">Reference: </span>
-          {finding.reference.label}
-          <br />
-          <span className="mono">{finding.reference.url}</span>
-        </p>
-      )}
-
       {finding.evidence && finding.evidence.length > 0 && (
-        <table className="print-kv">
-          <caption className="print-kv__caption">Evidence</caption>
+        <table className="p-rows p-rows--kv">
+          <caption className="p-caption">Evidence</caption>
+          <colgroup>
+            <col style={{ width: "34mm" }} />
+            <col />
+          </colgroup>
           <tbody>
             {finding.evidence.map((row, index) => (
-              <tr key={`${row.label}-${index}`}>
+              <tr key={`${row.label}-${index}`} className="p-row">
                 <th scope="row">{row.label}</th>
                 <td>
                   {row.value}
@@ -508,7 +539,33 @@ function FindingArticle({ entry }: { entry: FindingEntry }) {
         </table>
       )}
 
-      <p className="print-finding__check">Check: {check.title}</p>
+      {/*
+        Findings arrive grouped by severity, so a run of them usually came from
+        one check. Naming the check on every card printed "Check: HTTP security
+        headers" eleven times in a row and said nothing after the first. It is
+        printed only when it changes.
+      */}
+      {(showCheck || reference) && (
+        <p className="p-card__meta">
+          {showCheck && (
+            <>
+              Check: {check.title}
+              {reference && <span className="p-sep"> · </span>}
+            </>
+          )}
+          {reference && (
+            <>
+              Reference: {reference.label}
+              {hasReferenceUrl && (
+                <>
+                  {" "}
+                  <span className="mono">{reference.url}</span>
+                </>
+              )}
+            </>
+          )}
+        </p>
+      )}
     </article>
   );
 }
@@ -528,73 +585,139 @@ function Findings({ report }: { report: ScanReport }) {
         </p>
       ) : (
         <>
-          <p className="print-lead">
+          <p className="p-lead">
             {total} finding{total === 1 ? "" : "s"}, grouped by the part of the site each one
             concerns. Within a category the list runs from the most severe down.
           </p>
 
-          {sections.map((section) => {
-            const bands = SEVERITY_BANDS.map((severity) => ({
-              severity,
-              entries: section.entries.filter((entry) => entry.finding.severity === severity),
-            })).filter((band) => band.entries.length > 0);
-
-            return (
-              <div key={section.group} className="print-category">
-                <h3 className="print-category__title">{groupLabel(section.group)}</h3>
-                <p className="print-category__count">
-                  {section.entries.length} finding{section.entries.length === 1 ? "" : "s"} (
-                  {severitySummary(section.entries)})
-                </p>
-                {bands.map((band) => (
-                  <div key={band.severity} className="print-band">
-                    <h4 className="print-band__title">
-                      {SEVERITY_META[band.severity].label}
-                      <span className="print-band__count"> ({band.entries.length})</span>
-                    </h4>
-                    {band.entries.map((entry) => (
-                      <FindingArticle
-                        key={`${entry.check.id}-${entry.finding.id}`}
-                        entry={entry}
-                      />
-                    ))}
-                  </div>
-                ))}
-              </div>
-            );
-          })}
+          {sections.map((section) => (
+            <div key={section.group} className="p-group">
+              <h3>{groupLabel(section.group)}</h3>
+              <p className="p-group__meta">
+                {section.entries.length} finding{section.entries.length === 1 ? "" : "s"}
+                {section.entries.length > 0 && (
+                  <>
+                    <span className="p-sep"> · </span>
+                    {severitySummary(section.entries)}
+                  </>
+                )}
+              </p>
+              {section.entries.map((entry, index) => {
+                const previous = section.entries[index - 1];
+                const showCheck = previous?.check.id !== entry.check.id;
+                return (
+                  <FindingCard
+                    key={`${entry.check.id}-${entry.finding.id}`}
+                    entry={entry}
+                    showCheck={showCheck}
+                  />
+                );
+              })}
+            </div>
+          ))}
         </>
       )}
     </section>
   );
 }
 
-function CheckBlock({ result }: { result: CheckResult }) {
-  const facts = factsFor(result.data).slice(0, 10);
+/**
+ * Label/value facts on ruled lines, two pairs to a line when both values are
+ * short. The appendix is reference data, and a one-pair-per-line table of six
+ * short facts spent a third of a check's height on whitespace. A long value
+ * (a hostname list, a raw header) takes the whole line instead, because
+ * squeezing it into a half column wrapped it to three or four lines and read
+ * worse than the space it saved.
+ */
+const PAIR_MAX = 44;
+
+function canPair(row: FactRow | undefined): boolean {
+  return Boolean(row) && (row?.value.length ?? 0) <= PAIR_MAX;
+}
+
+function FactGrid({ rows }: { rows: FactRow[] }) {
+  const lines: Array<[FactRow | null, FactRow | null]> = [];
+  for (let index = 0; index < rows.length; ) {
+    const left = rows[index];
+    const right = rows[index + 1];
+    if (canPair(left) && canPair(right)) {
+      lines.push([left, right]);
+      index += 2;
+    } else {
+      lines.push([left, null]);
+      index += 1;
+    }
+  }
 
   return (
-    <article className={`print-check print-check--${result.status}`}>
-      <div className="print-check__head">
-        <span className="print-check__title">{result.title}</span>
-        <span className="print-check__status">{statusLabel(result.status)}</span>
+    <table className="p-rows p-rows--kv p-rows--pair">
+      <colgroup>
+        <col style={{ width: "34mm" }} />
+        <col />
+        <col style={{ width: "34mm" }} />
+        <col />
+      </colgroup>
+      <tbody>
+        {lines.map(([left, right], index) => (
+          <tr key={`${left?.label}-${index}`} className="p-row">
+            <th scope="row">{left?.label}</th>
+            <td>{left?.value}</td>
+            {right ? (
+              <>
+                <th scope="row">{right.label}</th>
+                <td>{right.value}</td>
+              </>
+            ) : (
+              <td colSpan={2} />
+            )}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function sourceText(source: string): string {
+  return source && source !== "none" ? source : "not reported";
+}
+
+function CheckCard({ result }: { result: CheckResult }) {
+  const didNotRun = result.status === "unavailable" || result.status === "skipped";
+  // A check that did not run carries only placeholder values ("none") in its
+  // payload. Printing them would pad the sheet with emptiness and repeat the
+  // reason; the status word and the reason are what the reader needs.
+  const facts = didNotRun ? [] : factsFor(result.data);
+
+  return (
+    <article className={`p-card p-card--check p-card--${result.status}`}>
+      <div className="p-card__head">
+        <span className="p-card__title">{result.title}</span>
+        <span className="p-card__sev">{statusLabel(result.status)}</span>
       </div>
-      <p className="print-check__headline">{result.headline}</p>
-      {facts.length > 0 && (
-        <table className="print-kv">
-          <tbody>
-            {facts.map((row, index) => (
-              <tr key={`${row.label}-${index}`}>
-                <th scope="row">{row.label}</th>
-                <td>{row.value}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+
+      <p className="p-card__detail">{result.headline}</p>
+
+      {facts.length > 0 && <FactGrid rows={facts} />}
+
+      {didNotRun ? (
+        <p className="p-card__meta">
+          <span className="p-strong">Reason: </span>
+          {result.note ?? "The check did not complete and reported no reason."}
+          <span className="p-sep"> · </span>
+          Source: {sourceText(result.source)}
+        </p>
+      ) : (
+        <p className="p-card__meta">
+          {result.note && (
+            <>
+              <span className="p-strong">Note: </span>
+              {result.note}
+              <span className="p-sep"> · </span>
+            </>
+          )}
+          Source: {sourceText(result.source)}
+        </p>
       )}
-      {result.note && <p className="print-note">Note: {result.note}</p>}
-      <p className="print-check__source">
-        Source: {result.source === "none" ? "not reported" : result.source}
-      </p>
     </article>
   );
 }
@@ -605,17 +728,17 @@ function Appendix({ report }: { report: ScanReport }) {
   return (
     <section className="print-section">
       <h2>Check by check</h2>
-      <p className="print-lead">
-        Every check that ran, grouped by what it looks at, with up to ten measured facts, any
-        note, and the source each answer came from. A check marked Unavailable is kept, with the
-        reason it could not complete.
+      <p className="p-lead">
+        Every check, grouped by what it looks at, with its measured facts, any note, and the
+        source it came from. A check marked Unavailable is kept, with the reason it could not
+        complete.
       </p>
 
       {sections.map((section) => (
-        <div key={section.group} className="print-appendix-group">
+        <div key={section.group} className="p-group">
           <h3>{groupLabel(section.group)}</h3>
           {section.results.map((result) => (
-            <CheckBlock key={result.id} result={result} />
+            <CheckCard key={result.id} result={result} />
           ))}
         </div>
       ))}
@@ -631,18 +754,20 @@ function Provenance({ report }: { report: ScanReport }) {
   ).sort((a, b) => a.localeCompare(b));
 
   return (
-    <footer className="print-footer print-section">
+    <footer className="print-section print-footer print-footer--page">
       <h2>Provenance</h2>
+
       <p>
         Every value in this report was read from a public source, queried directly from the
         browser that ran the scan. Nothing was uploaded to a server owned by Ocellus. A check
-        marked Unavailable means the source could not be reached or refused the request; it does
-        not mean the check passed, and it is excluded from the grade rather than counted as one.
+        marked Unavailable means the source could not be reached or refused the request; it
+        does not mean the check passed, and it is excluded from the grade rather than counted
+        as one.
       </p>
 
       {sources.length > 0 ? (
         <>
-          <h3>Sources consulted</h3>
+          <p className="p-label">Sources consulted</p>
           <ul className="print-sources">
             {sources.map((source) => (
               <li key={source} className="mono">
@@ -656,9 +781,9 @@ function Provenance({ report }: { report: ScanReport }) {
       )}
 
       <p>
-        This report is a set of automated observations of public data at one moment. It is not a
-        security assessment, a penetration test, or professional advice. A clean result means
-        the checks that ran found nothing they look for, not that the site is secure.
+        This report is a set of automated observations of public data at one moment. It is not
+        a security assessment, a penetration test, or professional advice. A clean result
+        means the checks that ran found nothing they look for, not that the site is secure.
       </p>
 
       <p className="print-footer__stamp">

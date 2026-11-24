@@ -7,15 +7,19 @@
  * document rendered by `PrintReport`. This file only decides which of the two
  * exists in each medium, and how the printed one lays out.
  *
- * Everything here is in points, which is the unit a page actually uses. Body
- * copy is 10pt on a 1.45 line height, which is a printed memo rather than a
- * screenshot of a browser. Status is never carried by colour alone: each check
- * and finding has a 3pt left border, a spelled-out status word, and a table row
- * label, so the sheet still reads in greyscale or from a photocopier.
+ * Three rules hold this sheet together:
  *
- * Colour is kept where it is meaning, because a status rail is the fastest way
- * to find a failure in a printed appendix, but it is confined to the 3pt left
- * border and the status word. Everything else is black on white.
+ *   1. One left edge. Every element starts at the page margin. Nothing gets an
+ *      ad-hoc indent; rhythm comes from the spacing scale, not from nudges.
+ *   2. One spacing scale in 4pt steps (4, 8, 12, 16, 24) and one type scale
+ *      (20 cover / 13 section / 11 category / 10 body / 9.5 facts / 8.5 meta).
+ *   3. Three surfaces, no more: `.p-block` (a full-width hairline box),
+ *      `.p-row` (a ruled label/value row on a fixed 34mm label column), and
+ *      `.p-card` (a finding or check with a 2.5pt severity rail and no box).
+ *
+ * Status and severity are carried by the rail colour plus a written word, so
+ * the sheet still reads in greyscale, and colour never touches body text.
+ * Everything is in points, the unit a page actually uses.
  */
 
 /* ------------------------------------------------------------------ screen -- */
@@ -39,7 +43,7 @@
 }
 
 @media print {
-  /* Keep status colour where it is used, and drop motion and shadow everywhere. */
+  /* Keep the rail colours, and drop motion and shadow everywhere. */
   *,
   *::before,
   *::after {
@@ -79,6 +83,24 @@
     display: none !important;
   }
 
+  /*
+   * Everything the scan workspace shows around the report on screen is screen
+   * furniture: the status legend, the per-status counts, the filter row and the
+   * result grid. The printed report carries all of that as prose and tables, so
+   * leaving the screen widgets in would print the same facts twice and spend
+   * pages on them.
+   *
+   * The done-state wrapper holds those widgets, then one last child that wraps
+   * the screen report (`article.screen-doc`) and the print document
+   * (`div.print-doc`). Hiding every child of that wrapper except the one that
+   * contains the print document leaves exactly the paper tree, without needing
+   * a class name on the shell. It only applies while a report exists, so a
+   * running scan still prints its progress.
+   */
+  body:has(.print-doc) main .container-page > div > :not(:has(.print-doc)) {
+    display: none !important;
+  }
+
   .print-doc,
   .print-doc header,
   .print-doc footer {
@@ -115,498 +137,450 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* --- typography --- */
+  /* ------------------------------------------------------------ type scale -- */
 
   .print-doc h1,
   .print-doc h2,
   .print-doc h3,
   .print-doc h4 {
     color: #111111;
+    font-weight: 700;
     break-after: avoid;
     page-break-after: avoid;
-    letter-spacing: 0;
     text-wrap: balance;
   }
 
+  /* Cover title: 20pt / 1.15. */
   .print-doc h1 {
     font-size: 20pt;
-    line-height: 1.1;
-    margin: 0 0 6pt;
+    line-height: 1.15;
+    margin: 0 0 8pt;
   }
 
+  /* Section: 13pt, uppercase, tracked. */
   .print-doc h2 {
     font-size: 13pt;
     line-height: 1.2;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
     margin: 0 0 8pt;
-    padding-bottom: 3pt;
-    border-bottom: 1.5pt solid #111111;
   }
 
+  /* Category: 11pt semibold. */
   .print-doc h3 {
     font-size: 11pt;
     line-height: 1.25;
-    margin: 14pt 0 5pt;
+    font-weight: 600;
+    margin: 12pt 0 4pt;
   }
 
+  /* Finding title: body size, semibold. It is a label, not a banner. */
   .print-doc h4 {
     font-size: 10pt;
-    line-height: 1.3;
-    margin: 0 0 3pt;
+    line-height: 1.35;
+    font-weight: 600;
+    margin: 0;
   }
 
   .print-doc p {
-    margin: 0 0 6pt;
+    margin: 0 0 8pt;
     orphans: 3;
     widows: 3;
   }
 
-  .print-doc .muted {
+  .print-doc .p-lead {
+    font-size: 10pt;
+    line-height: 1.45;
+    margin-bottom: 12pt;
+  }
+
+  /* Meta and source: 8.5pt, muted. */
+  .print-doc .p-meta,
+  .print-doc .p-label,
+  .print-doc .p-caption,
+  .print-doc .p-card__meta,
+  .print-doc .p-group__meta {
+    font-size: 8.5pt;
+    line-height: 1.4;
     color: #555555;
+  }
+
+  .print-doc .p-label,
+  .print-doc .p-caption {
+    display: block;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin: 0 0 4pt;
+  }
+
+  .print-doc .p-caption {
+    caption-side: top;
+    text-align: left;
+  }
+
+  .print-doc .p-sep {
+    color: #555555;
+  }
+
+  .print-doc .p-strong {
+    font-weight: 700;
+    color: #111111;
   }
 
   .print-doc .mono {
     font-family: var(--font-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
-    font-size: 9pt;
+    font-size: 8.5pt;
   }
 
-  .print-doc .print-lead {
-    font-size: 10.5pt;
-    line-height: 1.5;
-    margin-bottom: 10pt;
+  /* --------------------------------------------------------------- surfaces -- */
+
+  /* 1. Block: a full-width section with a hairline, and nothing inside it
+        indented beyond its own 8pt padding. */
+  .print-doc .p-block {
+    border: 0.75pt solid #bbbbbb;
+    padding: 8pt;
+    margin: 0 0 12pt;
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
+
+  .print-doc .p-block > :last-child {
+    margin-bottom: 0;
+  }
+
+  /* 2. Row: a two-column label/value table. The label column is fixed at 34mm
+        by a colgroup; the value column takes the rest and can never push the
+        sheet wider because the table is fixed-layout. A bottom hairline makes
+        one row, and the first head row gets a 4% tint. */
+  .print-doc .p-rows {
+    width: 100%;
+    max-width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    margin: 0 0 12pt;
+    font-size: 9.5pt;
+    line-height: 1.4;
+  }
+
+  .print-doc .p-rows th,
+  .print-doc .p-rows td {
+    padding: 4pt 8pt 4pt 0;
+    text-align: left;
+    vertical-align: top;
+    border-bottom: 0.5pt solid #dddddd;
+  }
+
+  /* A ruled row is one reading unit: a label never sits at the foot of one
+     page with its value at the head of the next. */
+  .print-doc .p-rows tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-doc .p-rows th + th,
+  .print-doc .p-rows th + td,
+  .print-doc .p-rows td + td,
+  .print-doc .p-rows td + th {
+    padding-left: 0;
+  }
+
+  .print-doc .p-rows thead th {
+    font-size: 8.5pt;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #111111;
+    background: #f4f4f4;
+    border-bottom: 0.75pt solid #bbbbbb;
+    padding-top: 4pt;
+    padding-bottom: 4pt;
+  }
+
+  .print-doc .p-rows tbody th[scope="row"] {
+    font-weight: 600;
+    color: #111111;
+  }
+
+  .print-doc .p-rows--kv tbody th[scope="row"] {
+    font-weight: 400;
+    color: #555555;
+  }
+
+  .print-doc .p-rows .p-num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* One tinted header row per table is the only fill on the sheet; a total row
+     is a heavier rule, not another fill. */
+  .print-doc .p-rows .p-total th,
+  .print-doc .p-rows .p-total td {
+    font-weight: 700;
+    border-top: 0.75pt solid #111111;
+    border-bottom: 0.75pt solid #111111;
+  }
+
+  /* The cover metadata is a tight ruled list, not a summary table. */
+  .print-doc .p-rows--kv tbody tr.p-row {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Two value pairs per line. The label columns are narrow and the value
+     columns take the rest, and an absent second pair still occupies its cells
+     so every line keeps the same grid. */
+  .print-doc .p-rows--pair th,
+  .print-doc .p-rows--pair td {
+    padding-right: 8pt;
+  }
+
+  .print-doc .p-rows--pair th:nth-of-type(2),
+  .print-doc .p-rows--pair td:nth-of-type(2) {
+    padding-left: 8pt;
+  }
+
+  .print-doc .print-cover__meta {
+    margin: 0 0 16pt;
+  }
+
+  /* 3. Card: a finding or a check. A 2.5pt rail carries severity; there is no
+        box, so nothing is double-framed. The rail hangs into the margin by its
+        own width plus the padding, so the card's text sits on the same left
+        edge as every heading and table rather than starting 10.5pt in. */
+  .print-doc .p-card {
+    border-left: 2.5pt solid #999999;
+    padding: 0 0 0 8pt;
+    margin: 0 0 8pt -10.5pt;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-doc .p-card__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8pt;
+    margin: 0 0 4pt;
+  }
+
+  .print-doc .p-card__title {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-weight: 600;
+    font-size: 10pt;
+    line-height: 1.35;
+  }
+
+  /* The spelled-out severity or status, right-aligned on the title baseline. */
+  .print-doc .p-card__sev {
+    flex: none;
+    font-size: 8.5pt;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #111111;
+    white-space: nowrap;
+  }
+
+  .print-doc .p-card__detail {
+    margin: 0 0 4pt;
+    font-size: 10pt;
+    line-height: 1.45;
+  }
+
+  .print-doc .p-card__detail:last-child {
+    margin-bottom: 0;
+  }
+
+  .print-doc .p-card__meta {
+    margin: 4pt 0 0;
+  }
+
+  .print-doc .p-card .p-rows {
+    margin: 4pt 0 4pt;
+  }
+
+  .print-doc .p-card .p-rows th,
+  .print-doc .p-card .p-rows td {
+    padding-top: 0;
+    padding-bottom: 4pt;
+  }
+
+  /* A card is kept whole when it fits, which is the normal case. A card too
+     tall for the space left was held whole anyway, stranding a page with one
+     category heading and half a card on it; it may split when it cannot fit. */
+  .print-doc .p-card--split {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  /* Severity rails. Two stops only, so one glance separates act-now from
+     read-later; the word beside the title says which is which exactly. */
+  .print-doc .p-card--critical,
+  .print-doc .p-card--high,
+  .print-doc .p-card--fail { border-left-color: #b32630; }
+
+  .print-doc .p-card--medium,
+  .print-doc .p-card--warn { border-left-color: #92610a; }
+
+  .print-doc .p-card--low,
+  .print-doc .p-card--info { border-left-color: #1b5f9e; }
+
+  .print-doc .p-card--pass { border-left-color: #14794a; }
+
+  .print-doc .p-card--unavailable,
+  .print-doc .p-card--skipped { border-left-color: #6b7686; }
 
   /* --- cover --- */
 
-  .print-cover {
+  .print-doc .print-cover {
     break-after: page;
     page-break-after: always;
-    display: flex;
     flex-direction: column;
-    /* A4 is 297mm tall and the page margins take 28mm, so 240mm leaves room
-       for a wrapped host name without spilling onto a second sheet. */
+    /* A4 is 297mm tall and the margins take 28mm, so 240mm leaves room for a
+       wrapped host name without spilling onto a second sheet. */
     min-height: 240mm;
     padding-top: 6mm;
   }
 
   .print-doc .print-cover__product {
-    font-size: 11pt;
+    font-size: 8.5pt;
     font-weight: 700;
     letter-spacing: 0.14em;
     text-transform: uppercase;
+    margin: 0;
   }
 
   .print-doc .print-cover__kind {
-    font-size: 10pt;
+    font-size: 8.5pt;
     color: #555555;
-    margin: 2pt 0 0;
-    padding-bottom: 10pt;
-    border-bottom: 2pt solid #111111;
+    margin: 4pt 0 0;
+    padding-bottom: 8pt;
+    border-bottom: 0.75pt solid #111111;
   }
 
   .print-doc .print-cover__host {
     margin-top: 16mm;
-    font-size: 20pt;
-    font-weight: 700;
-    word-break: break-word;
   }
 
-  .print-score {
-    margin-top: 8mm;
+  .print-doc .print-cover__score {
     display: flex;
     align-items: baseline;
     gap: 8pt;
-    border: 1.5pt solid #111111;
-    padding: 10pt 14pt;
-    align-self: flex-start;
+    margin-top: 8mm;
   }
 
-  .print-score__number {
-    font-size: 34pt;
+  .print-doc .print-cover__number {
+    font-size: 20pt;
     font-weight: 700;
-    line-height: 1;
+    line-height: 1.15;
   }
 
-  .print-score__of {
-    font-size: 12pt;
+  .print-doc .print-cover__of {
+    font-size: 10pt;
     color: #555555;
   }
 
-  .print-score__grade {
-    margin-left: 12pt;
-    padding-left: 12pt;
-    border-left: 1pt solid #bbbbbb;
-    font-size: 13pt;
+  .print-doc .print-cover__grade {
+    margin-left: auto;
+    font-size: 11pt;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.06em;
   }
 
-  .print-doc .print-verdict {
-    font-size: 12pt;
-    font-weight: 600;
-    margin-top: 6pt;
-  }
-
-  .print-cover__meta {
-    display: grid;
-    grid-template-columns: 34mm minmax(0, 1fr);
-    gap: 4pt 8pt;
-    margin: 12mm 0 10pt;
+  .print-doc .print-cover__verdict {
     font-size: 10pt;
-    border-top: 1pt solid #cccccc;
-    padding-top: 8pt;
+    font-weight: 600;
+    margin: 8pt 0 0;
   }
 
-  .print-cover__meta dt {
-    color: #555555;
-  }
-
-  .print-cover__meta dd {
-    margin: 0;
-  }
-
-  .print-contents {
+  .print-doc .print-contents {
     margin-top: auto;
     padding-top: 8pt;
-    border-top: 1pt solid #cccccc;
+    border-top: 0.75pt solid #bbbbbb;
   }
 
-  .print-doc .print-contents__title {
-    font-size: 9pt;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: #555555;
-    margin: 0 0 4pt;
-  }
-
-  .print-contents ol {
+  .print-doc .print-contents ol {
     margin: 0;
-    padding-left: 16pt;
+    padding: 0;
+    list-style: none;
     font-size: 10pt;
+    line-height: 1.45;
   }
 
-  .print-contents li {
-    margin: 1pt 0;
+  .print-doc .print-contents li {
+    margin: 0;
+    padding: 4pt 0;
   }
 
   /* --- sections --- */
 
   /*
    * Sections flow on from each other. Only the cover forces a page break: a
-   * long appendix that tried to start fresh on every heading would leave half
-   * pages of white, and a block that fits should not be pushed.
+   * long appendix that started fresh on every heading would leave half pages
+   * of white, and a block that fits should not be pushed.
    */
-  .print-section {
-    margin-top: 14pt;
+  .print-doc .print-section {
+    margin-top: 16pt;
   }
 
-  .print-footer.print-section {
-    margin-top: 18pt;
+  .print-doc .print-section:first-of-type {
+    margin-top: 0;
   }
 
-  /* --- summary tables --- */
-
-  .print-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 0 0 12pt;
-    font-size: 10pt;
-    table-layout: fixed;
+  .print-doc .p-group {
+    margin: 0 0 8pt;
   }
 
-  .print-table th,
-  .print-table td {
-    border-bottom: 0.5pt solid #bbbbbb;
-    padding: 3pt 6pt 3pt 0;
-    text-align: left;
-    vertical-align: top;
+  .print-doc .p-group__meta {
+    margin: 0 0 8pt;
   }
 
-  .print-table thead th {
-    border-bottom: 1pt solid #111111;
-    font-size: 8.5pt;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: #333333;
-  }
-
-  .print-table th[scope="row"] {
-    font-weight: 600;
-  }
-
-  .print-table td.num,
-  .print-table th.num {
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .print-table__total th,
-  .print-table__total td {
-    border-top: 1pt solid #111111;
-    border-bottom: 1pt solid #111111;
-    font-weight: 700;
-  }
-
-  /* Five columns at an even split gives too much room to a number and too
-     little to the category name, which is the only one that wraps. Width is
-     declared on the head row because the table is fixed-layout. */
-  .print-table--category thead th:first-child {
-    width: 38%;
-  }
-
-  .print-table--category thead th:last-child {
-    width: 11%;
-  }
-
-  /* --- callout --- */
-
-  .print-callout {
-    border-left: 3pt solid #111111;
-    background: #f4f4f4;
-    padding: 7pt 10pt;
-    margin-top: 4pt;
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
-  .print-doc .print-callout__title {
-    font-size: 10pt;
-    font-weight: 700;
-    margin-bottom: 3pt;
-  }
-
-  .print-callout p:last-child {
-    margin-bottom: 0;
-  }
-
-  /* --- findings --- */
-
-  .print-category {
-    margin-top: 4pt;
-  }
-
-  .print-doc .print-category__title {
-    font-size: 11.5pt;
-    font-weight: 700;
-    margin: 12pt 0 1pt;
-    padding-bottom: 2pt;
-    border-bottom: 1pt solid #111111;
-    break-after: avoid;
-    page-break-after: avoid;
-  }
-
-  .print-doc .print-category__count {
-    font-size: 9pt;
-    color: #555555;
-    margin: 2pt 0 6pt;
-  }
-
-  .print-band {
-    margin-top: 6pt;
-  }
-
-  .print-doc .print-band__title {
-    font-size: 8.5pt;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: #333333;
-    margin: 6pt 0 4pt;
-    break-after: avoid;
-    page-break-after: avoid;
-  }
-
-  .print-band__count {
-    font-weight: 400;
-    color: #555555;
-  }
-
-  .print-finding {
-    break-inside: avoid;
-    page-break-inside: avoid;
-    margin: 0 0 10pt;
-    padding: 0 0 2pt 8pt;
-    border-left: 3pt solid #999999;
-  }
-
-  .print-finding--critical { border-left-color: #b32630; }
-  .print-finding--high { border-left-color: #b32630; }
-  .print-finding--medium { border-left-color: #92610a; }
-  .print-finding--low { border-left-color: #1b5f9e; }
-  .print-finding--info { border-left-color: #6b7686; }
-
-  .print-doc .print-finding__title {
-    font-size: 10.5pt;
-    font-weight: 700;
-    margin: 0;
-  }
-
-  .print-doc .print-finding__detail {
-    margin-top: 2pt;
-  }
-
-  .print-doc .print-finding__fix,
-  .print-doc .print-finding__ref {
-    margin-top: 2pt;
-    font-size: 9.5pt;
-  }
-
-  .print-finding__label {
-    font-weight: 700;
-  }
-
-  .print-doc .print-finding__check {
-    margin-top: 3pt;
-    font-size: 8.5pt;
-    color: #555555;
-  }
-
-  /* --- key/value tables (evidence, facts) --- */
-
-  .print-kv {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 3pt 0 4pt;
-    font-size: 9pt;
-    table-layout: fixed;
-  }
-
-  .print-kv__caption {
-    caption-side: top;
-    text-align: left;
-    font-size: 8pt;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: #555555;
-    padding-bottom: 2pt;
-  }
-
-  .print-kv th,
-  .print-kv td {
-    border-top: 0.5pt solid #cccccc;
-    padding: 2pt 6pt 2pt 0;
-    text-align: left;
-    vertical-align: top;
-  }
-
-  .print-kv th {
-    width: 40mm;
-    color: #444444;
-    font-weight: 500;
-  }
-
-  /* --- appendix --- */
-
-  .print-appendix-group {
-    margin-top: 4pt;
-  }
-
-  .print-appendix-group h3 {
-    break-after: avoid;
-    page-break-after: avoid;
-  }
-
-  .print-check {
-    break-inside: avoid;
-    page-break-inside: avoid;
-    margin: 0 0 9pt;
-    padding: 2pt 0 2pt 8pt;
-    border-left: 3pt solid #999999;
-  }
-
-  .print-check--pass { border-left-color: #14794a; }
-  .print-check--warn { border-left-color: #92610a; }
-  .print-check--fail { border-left-color: #b32630; }
-  .print-check--info { border-left-color: #1b5f9e; }
-  .print-check--unavailable,
-  .print-check--skipped { border-left-color: #6b7686; }
-
-  .print-check__head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 8pt;
-  }
-
-  .print-check__title {
-    font-size: 10pt;
-    font-weight: 700;
-  }
-
-  .print-check__status {
-    flex: none;
-    font-size: 8pt;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    white-space: nowrap;
-  }
-
-  .print-check--pass .print-check__status { color: #14794a; }
-  .print-check--warn .print-check__status { color: #92610a; }
-  .print-check--fail .print-check__status { color: #b32630; }
-  .print-check--info .print-check__status { color: #1b5f9e; }
-  .print-check--unavailable .print-check__status,
-  .print-check--skipped .print-check__status { color: #6b7686; }
-
-  .print-doc .print-check__headline {
-    margin-top: 2pt;
-    font-size: 9.5pt;
-  }
-
-  .print-doc .print-check__source {
-    font-size: 8.5pt;
-    color: #555555;
-    margin-top: 2pt;
-  }
-
-  .print-doc .print-note {
-    font-size: 8.5pt;
-    color: #444444;
-    margin-top: 2pt;
-  }
-
-  /* --- footer and provenance --- */
+  /* --- provenance --- */
 
   /*
-   * The footer is not kept whole. It carries the full source list, which can
-   * run to a page on its own, and an unbreakable block that tall would be
-   * pushed off the sheet entirely.
+   * Provenance is one page of reference material, so it is kept together rather
+   * than flowing after the appendix. On its own it is shorter than a sheet;
+   * split across two it left a page holding only a closing paragraph and the
+   * stamp.
    */
-  .print-footer {
-    margin-top: 16pt;
-    padding-top: 8pt;
-    border-top: 1pt solid #999999;
-    font-size: 9pt;
-    color: #333333;
+  .print-doc .print-footer--page {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
-  .print-footer h2 {
-    border-bottom: none;
-    font-size: 12pt;
-    margin-bottom: 4pt;
-  }
-
-  .print-sources {
+  /*
+   * Sources are a reference index, not a table. They run in three columns to
+   * keep a 32-item list compact, and the space between rows does the separating
+   * so each item needs no rule of its own: a list of 32 hairlines was a page of
+   * lines with text between them.
+   */
+  .print-doc .print-sources {
     margin: 0 0 8pt;
-    padding-left: 0;
+    padding: 0;
     list-style: none;
     font-size: 8.5pt;
-    color: #333333;
+    line-height: 1.45;
+    color: #555555;
+    columns: 3;
+    column-gap: 12pt;
   }
 
-  .print-sources li {
-    padding: 1.5pt 0;
-    border-bottom: 0.5pt solid #dddddd;
+  .print-doc .print-sources li {
+    padding: 0 0 4pt;
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
   .print-doc .print-footer__stamp {
-    margin-top: 8pt;
-    font-size: 8pt;
-    color: #666666;
+    margin: 8pt 0 0;
+    font-size: 8.5pt;
+    color: #555555;
+    padding-top: 8pt;
+    border-top: 0.75pt solid #bbbbbb;
   }
 }
 
@@ -627,6 +601,7 @@
 .print-doc h2,
 .print-doc h3,
 .print-doc h4,
+.print-doc span,
 .print-doc code,
 .print-doc a,
 .print-doc .mono {
