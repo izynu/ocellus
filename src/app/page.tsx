@@ -40,13 +40,23 @@ type Feature = {
 
 const FEATURES: Feature[] = [
   {
-    href: "/scan",
-    label: "Scan",
-    title: "Full site scan",
-    body: "One hostname, every question at once: DNS, certificates, headers, email, exposure, reputation, privacy, accessibility and performance, grouped so nothing blurs together.",
-    works: "Type a domain and results stream in as each source answers.",
-    metric: `${checks.length} checks, ${GROUP_ORDER.length} categories`,
-    cta: "Scan a site",
+    href: "/whois",
+    label: "Whois",
+    title: "Whois and host lookup",
+    body: "Who owns the domain, when it was registered and expires, which nameservers and aliases answer, whether DNSSEC is in place, and which hostnames sit underneath.",
+    works: "Type a domain and ten name-layer lookups answer in sequence.",
+    metric: "10 ownership and DNS lookups",
+    cta: "Look up a domain",
+    live: true,
+  },
+  {
+    href: "/ports",
+    label: "Ports",
+    title: "Ports and Nmap",
+    body: "A staged sweep of every public index in nmapAutomator's order: resolve, ownership, observed ports, services and reverse name, with the nmap command for each stage.",
+    works: "Enter a host to run the sweep, then copy the command that scans it for real.",
+    metric: `${NMAP_PROFILES.length} nmap profiles, one keyless index`,
+    cta: "Run the sweep",
     live: true,
   },
   {
@@ -57,16 +67,6 @@ const FEATURES: Feature[] = [
     works: "Paste a URL for a live verdict, or choose a file to hash it in the tab.",
     metric: "2 live reputation feeds, plus a hash lookup",
     cta: "Check a URL",
-    live: true,
-  },
-  {
-    href: "/ports",
-    label: "Ports",
-    title: "Ports and Nmap",
-    body: "Read the ports Shodan recorded for an address, and get the exact nmap and nmapAutomator command that scans it for real from your own machine.",
-    works: "Enter a host to read its observed ports, then copy the command that finds the rest.",
-    metric: `${NMAP_PROFILES.length} nmap profiles, one keyless index`,
-    cta: "Read ports",
     live: true,
   },
   {
@@ -99,6 +99,16 @@ const FEATURES: Feature[] = [
     cta: "Browse sources",
     live: true,
   },
+  {
+    href: "/scan",
+    label: "Full scan",
+    title: "Complete site scan",
+    body: "Everything above in one report, plus headers, email authentication, reputation, privacy, accessibility and performance, grouped by category.",
+    works: "Type a domain and every check runs, grouped so nothing blurs together.",
+    metric: `${checks.length} checks, ${GROUP_ORDER.length} categories`,
+    cta: "Run the full scan",
+    live: true,
+  },
 ];
 
 const ALSO = [
@@ -115,48 +125,35 @@ export default function HomePage() {
       <div className="container-page">
         {/* ------------------------------------------------------------ hero -- */}
         <section className="rise pt-12 pb-2 md:pt-20">
-          <p className="eyebrow">Website audit and reconnaissance</p>
-          <h1 className="mt-3" style={{ maxWidth: "22ch" }}>
-            What a hostname gives away, and the tools to ask.
+          <p className="eyebrow">Reconnaissance and exposure</p>
+          <h1 className="mt-3" style={{ maxWidth: "24ch" }}>
+            Who owns a host, what it exposes, and what the internet already knows about it.
           </h1>
           <p
             className="mt-5"
-            style={{ fontSize: "1.04em", maxWidth: "62ch", color: "var(--muted-foreground)" }}
+            style={{ fontSize: "1.04em", maxWidth: "64ch", color: "var(--muted-foreground)" }}
           >
-            Six working tools in one page: a full site scan, a URL and file scanner, a ports and Nmap
-            console, a recon workflow, a dork generator and a source catalogue. Everything runs in your
-            browser against public sources, with no account and no key of ours.
+            Look up registration and ownership, read the ports and services an index has seen, run the
+            nmap command that scans it for real, check a URL against the reputation feeds, and map the
+            hostnames underneath. Every answer comes from a named public source, read in your browser.
           </p>
 
-          <form
-            action={asset("/scan")}
-            method="get"
-            className="mt-7 flex flex-col gap-2.5 sm:flex-row"
-            style={{ maxWidth: 620 }}
-          >
-            <label htmlFor="url" className="sr-only">
-              Website address
-            </label>
-            <input
-              id="url"
-              name="url"
-              type="text"
-              inputMode="url"
-              autoComplete="url"
-              required
-              placeholder="example.com"
-              spellCheck={false}
-              className="field sm:flex-1"
-            />
-            <button type="submit" className="btn btn-primary">
-              Scan this site
-            </button>
-          </form>
+          <p className="mt-7 flex flex-wrap gap-2">
+            <Link href="/ports" className="btn btn-primary">
+              Ports and Nmap sweep
+            </Link>
+            <Link href="/url-scan" className="btn btn-quiet">
+              Check a URL
+            </Link>
+            <Link href="/sources" className="btn btn-ghost">
+              Browse sources
+            </Link>
+          </p>
 
           <p className="mt-3" style={{ fontSize: "0.86em", color: "var(--muted-foreground)" }}>
-            {checks.length} checks in {GROUP_ORDER.length} categories, {native} of {SOURCES.length}{" "}
-            catalogued sources read directly. Your browser queries each one; no server of ours is in the
-            path.
+            {native} of {SOURCES.length} catalogued sources are read directly by this product, and the
+            full scan runs {checks.length} checks across {GROUP_ORDER.length} categories. Your browser
+            queries each one; no server of ours is in the path.
           </p>
         </section>
 

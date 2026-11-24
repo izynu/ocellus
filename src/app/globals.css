@@ -138,8 +138,16 @@
 
 html {
   -webkit-text-size-adjust: 100%;
-  scroll-behavior: smooth;
+  /*
+   * No `scroll-behavior: smooth`. It made a new page animate toward its old
+   * offset on navigation, which reads as landing halfway down an unrelated
+   * page. A tool that opens on a result should open at the top, instantly.
+   */
   scroll-padding-top: 88px;
+  /* Keep a wide child from scrolling the page sideways, without touching body:
+     `overflow-x` on body also computes `overflow-y: auto`, which turns the body
+     into a second scroll container and breaks scroll restoration. */
+  overflow-x: clip;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -172,8 +180,6 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   min-height: 100dvh;
-  /* Never let a wide child push the page sideways. */
-  overflow-x: hidden;
 }
 
 h1,

@@ -8,6 +8,7 @@ import {
 } from "@/lib/site";
 import { ThemeToggle } from "./theme-toggle";
 import { Scene } from "./scene";
+import { ScrollReset } from "./scroll-reset";
 
 /**
  * The wordmark.
@@ -221,6 +222,7 @@ export function SiteFooter() {
 export function SiteShell({ children }: { children: React.ReactNode }) {
   return (
     <>
+      <ScrollReset />
       <Scene />
       <SiteHeader />
       <main id="main">{children}</main>
